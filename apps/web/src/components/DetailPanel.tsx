@@ -67,7 +67,7 @@ function NodeDetail({ data, node, editor, onSelect, onDelete, onClose }: Props &
           </Field>
           <div className="field-row">
             <NumberField label="Velikost písma" value={node.fontSize} min={4} onChange={(fontSize) => edit({ fontSize }, 'font')} />
-            <span className="field hint">Velikost uzlu změníte tažením rohů v mapě.</span>
+            <span className="field hint">Velikost uzlu změníš tažením rohů v mapě.</span>
           </div>
           <Field label="Poznámka">
             <textarea rows={3} value={node.note} onChange={(e) => edit({ note: e.target.value }, 'note')} />
@@ -196,7 +196,7 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
                 )}
               </div>
               {link.shape === 'polyline' && (
-                <p className="hint">Body lomu přesunete tažením, tažením „+“ přidáte nový bod, dvojklikem bod odeberete.</p>
+                <p className="hint">Body lomu přesuneš tažením, tažením „+“ přidáš nový bod, dvojklikem bod odebereš.</p>
               )}
             </>
           )}

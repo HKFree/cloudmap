@@ -34,7 +34,7 @@ export async function commitChanges(
     if (options.expectedRevisionId !== undefined) {
       const latest = await getRevision(trx);
       if ((latest?.id ?? null) !== options.expectedRevisionId) {
-        throw new ConflictError('Mapu mezitím změnil někdo jiný. Načtěte ji znovu a změny zopakujte.');
+        throw new ConflictError('Mapu mezitím změnil někdo jiný. Načti ji znovu a změny zopakuj.');
       }
     }
     const changeset = typeof changes === 'function' ? await changes(trx) : changes;

@@ -87,7 +87,7 @@ export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfi
     if (request.user) return;
 
     const path = request.url.split('?')[0]!;
-    if (path.startsWith('/api/')) return reply.code(401).send({ error: 'Nejste přihlášeni' });
+    if (path.startsWith('/api/')) return reply.code(401).send({ error: 'Nejsi přihlášený' });
     const wantsPage = request.method === 'GET' && request.headers.accept?.includes('text/html');
     if (wantsPage && !path.startsWith('/auth/') && path !== '/healthz') {
       return reply.redirect(`/auth/login?returnTo=${encodeURIComponent(request.url)}`);
@@ -151,7 +151,7 @@ export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfi
     } catch (error) {
       request.log.warn({ err: error }, 'SSO login failed');
     }
-    if (!claims) return reply.code(401).type('text/plain; charset=utf-8').send('Přihlášení se nezdařilo. Zkuste to znovu: /auth/login');
+    if (!claims) return reply.code(401).type('text/plain; charset=utf-8').send('Přihlášení se nezdařilo. Zkus to znovu: /auth/login');
 
     startSession(reply, userFromClaims(claims));
     return reply.redirect(pending.returnTo);

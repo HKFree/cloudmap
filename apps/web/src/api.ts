@@ -30,7 +30,7 @@ function handleExpiredLogin(method: string): never {
     throw new ApiError('Přesměrování na přihlášení…', 401);
   }
   throw new ApiError(
-    'Přihlášení vypršelo. Přihlaste se znovu v novém panelu na adrese /auth/login a pak uložte znovu – úpravy zůstanou zachovány.',
+    'Přihlášení vypršelo. Přihlas se znovu v novém panelu na adrese /auth/login a pak ulož znovu – úpravy zůstanou zachované.',
     401,
   );
 }
