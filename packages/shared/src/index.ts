@@ -15,6 +15,11 @@ export const linkTypeSchema = z.object({
   dash: z.string(),
   description: z.string(),
   sortOrder: z.number().int(),
+  /**
+   * Leased connectivity between two distant sites (outside hkfree infrastructure).
+   * Such links are drawn only as short stubs at both ends instead of a line across the map.
+   */
+  remote: z.boolean().default(false),
 });
 
 export const nodeTypeSchema = z.object({
@@ -53,8 +58,14 @@ export const mapLinkSchema = z.object({
   shape: z.enum(linkShapes),
   /** Arc bulge as a fraction of the chord length, positive = left of the from→to direction. */
   curvature: z.number(),
-  /** Bezier control points or polyline vertices between the two endpoints. */
+  /**
+   * Bezier control points or polyline vertices between the two endpoints.
+   * For links of a remote type: the outer ends of the from and to stubs.
+   */
   points: z.array(pointSchema),
+  /** Rounding of polyline corners in px. */
+  cornerRadius: z.number().nonnegative().default(0),
+  /** Throughput, e.g. "250Mbps". */
   capacity: z.string(),
   labelX: z.number().nullable(),
   labelY: z.number().nullable(),
@@ -89,6 +100,52 @@ export const mapDataSchema = z.object({
   labels: z.array(mapLabelSchema),
 });
 
+const changeCountsSchema = z.object({
+  added: z.number().int(),
+  changed: z.number().int(),
+  deleted: z.number().int(),
+});
+
+export const revisionSummarySchema = revisionSchema.extend({
+  changes: z.object({
+    linkTypes: changeCountsSchema,
+    nodeTypes: changeCountsSchema,
+    nodes: changeCountsSchema,
+    links: changeCountsSchema,
+    labels: changeCountsSchema,
+  }),
+});
+
+export const mapCollections = ['linkTypes', 'nodeTypes', 'nodes', 'links', 'labels'] as const;
+
+const ids = z.array(id).default([]);
+
+export const mapChangesSchema = z.object({
+  upsert: z
+    .object({
+      linkTypes: z.array(linkTypeSchema).default([]),
+      nodeTypes: z.array(nodeTypeSchema).default([]),
+      nodes: z.array(mapNodeSchema).default([]),
+      links: z.array(mapLinkSchema).default([]),
+      labels: z.array(mapLabelSchema).default([]),
+    })
+    .prefault({}),
+  delete: z
+    .object({ linkTypes: ids, nodeTypes: ids, nodes: ids, links: ids, labels: ids })
+    .prefault({}),
+});
+
+export const saveChangesSchema = mapChangesSchema.extend({
+  /** Revision the client started editing from; saving fails if the map changed since. */
+  baseRevisionId: z.number().int().nullable(),
+  message: z.string().max(500).default(''),
+  author: z.string().max(255).default(''),
+});
+
+export const restoreRevisionSchema = z.object({
+  message: z.string().max(500).default(''),
+});
+
 export const metaSchema = z.object({
   name: z.string(),
   version: z.string(),
@@ -106,3 +163,12 @@ export type MapLabel = z.infer<typeof mapLabelSchema>;
 export type Revision = z.infer<typeof revisionSchema>;
 export type MapData = z.infer<typeof mapDataSchema>;
 export type Meta = z.infer<typeof metaSchema>;
+export type ChangeCounts = z.infer<typeof changeCountsSchema>;
+export type RevisionSummary = z.infer<typeof revisionSummarySchema>;
+export type MapCollection = (typeof mapCollections)[number];
+export type MapChanges = z.infer<typeof mapChangesSchema>;
+export type SaveChanges = z.input<typeof saveChangesSchema>;
+
+export { diffMaps, countChanges } from './diff';
+export { assignReadableIds, isTemporaryId, slugify, temporaryId, uniqueId } from './ids';
+export { CORE_NODE_ID, checkTopology, hasTopologyProblems, linkedNodeIds, type TopologyProblems } from './topology';

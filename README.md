@@ -18,7 +18,39 @@ npm test
 npm run typecheck
 ```
 
-API dokumentace (OpenAPI): `/api/v1/docs`.
+API dokumentace (OpenAPI): `/api/v1/docs`. Hlavní endpointy:
+
+- `GET /api/v1/map[?revision=N]` – celá mapa, aktuální nebo po revizi N
+- `POST /api/v1/changes` – uložení změn jako nové revize (`upsert` / `delete` podle id, `baseRevisionId` chrání proti přepsání cizích změn)
+- `GET /api/v1/revisions` – historie se souhrnem změn
+- `POST /api/v1/revisions/:id/restore` – obnovení starší verze (vznikne nová revize)
+
+## Úpravy mapy
+
+Tlačítko „Upravit mapu“ přepne do editoru (ovládání je v levém panelu):
+
+- přesun uzlů a popisků tažením; oblast se přesouvá i s uzly a menšími oblastmi uvnitř
+- velikost uzlu se mění tažením rohů vybraného uzlu
+- lomený spoj: body lomu se táhnou, tažením „+“ přibude nový bod, dvojklik bod odebere,
+  zaoblení rohů se nastaví v panelu
+- přidání uzlu, spoje a popisku, úprava vlastností, správa typů spojů
+- Zpět/Znovu (Ctrl+Z / Ctrl+Shift+Z), mazání klávesou Delete
+
+Změny se drží v prohlížeči a až „Uložit“ vytvoří novou revizi. Před uložením proběhne kontrola sítě:
+spoje s nepřipojeným koncem a lokality bez cesty do centrálního uzlu **4 PMV IGW** (id `4-pmv-igw`,
+nelze jej smazat) se zvýrazní a vypíšou, nově vzniklé problémy zvlášť. Uložit lze i přesto.
+
+V historii se po kliknutí na revizi zvýrazní, co změnila: přidané zeleně, změněné oranžově
+(se seznamem změněných vlastností) a smazané jako červený přerušovaný obrys.
+
+Typ spoje označený jako **vzdálený spoj** (např. „datová konektivita“, pronajatá optika mimo síť
+hkfree) se nekreslí přes celou mapu, ale jen jako krátké konce u obou uzlů s názvem protější
+strany. Kliknutím na kterýkoli konec se vybere celý spoj a zvýrazní se obě strany.
+
+Vybraný uzel, spoj či zobrazená revize jsou v adrese za `#` (např. `#uzel=183-natura`,
+`#spoj=183-natura--4-pmv-igw`, `#revize=3`), odkaz lze poslat dál a funguje tlačítko Zpět.
+Id vznikne z názvu při prvním uložení a dál se nemění (ani při přejmenování), aby odkazy
+a historie zůstaly platné. Spoj má id podle svých koncových uzlů.
 
 ## Kontejner (podman i docker)
 
@@ -43,4 +75,4 @@ a zobrazuje se v patičce aplikace.
 2. `git tag v0.2.0 && git push --tags`
 3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.2.0` (+ `:0.2`, `:latest`) a GitHub release
 
-Každý push do `master` vydá image `:edge` pro testování.
+Každý push do `main` vydá image `:edge` pro testování.

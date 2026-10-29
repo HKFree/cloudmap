@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 150" width="240" height="150">
+  <path d="M217.8 79.0A16.7 16.7 0 0 1 203.5 102.9A38.9 38.9 0 0 1 143.2 126.6A27.8 27.8 0 0 1 96.8 126.6A38.9 38.9 0 0 1 36.5 102.9A16.7 16.7 0 0 1 22.2 79.0A26.8 26.8 0 0 1 45.2 40.6A24.2 24.2 0 0 1 82.7 25.9A44.7 44.7 0 0 1 157.3 25.9A24.2 24.2 0 0 1 194.8 40.6A26.8 26.8 0 0 1 217.8 79.0Z" fill="#f2fff2" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <g stroke="#0e820e" stroke-width="3" opacity="0.55">
+    <line x1="52" y1="52" x2="92" y2="34"/><line x1="92" y1="34" x2="150" y2="36"/><line x1="150" y1="36" x2="190" y2="58"/>
+    <line x1="52" y1="52" x2="62" y2="108"/><line x1="190" y1="58" x2="178" y2="110"/><line x1="62" y1="108" x2="178" y2="110"/>
+  </g>
+  <g fill="#75ff75" stroke="#000" stroke-width="2">
+    <circle cx="52" cy="52" r="7"/><circle cx="92" cy="34" r="6"/><circle cx="150" cy="36" r="6"/>
+    <circle cx="190" cy="58" r="7"/><circle cx="62" cy="108" r="6"/><circle cx="178" cy="110" r="6"/>
+  </g>
+  <text x="120" y="88" font-family="Helvetica, Arial, sans-serif" font-size="40" font-weight="bold" text-anchor="middle" fill="#1f2328">hkfree</text>
+</svg>

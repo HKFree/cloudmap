@@ -24,8 +24,9 @@ try {
     replace: values.replace,
     message: values.message,
   });
-  console.log(`Import hotov, revize #${revision.id}`);
+  console.log(revision ? `Import hotov, revize #${revision.id}` : 'Mapa už odpovídá diagramu, nová revize nevznikla');
   console.log(`Popisky přiřazené ke spojům: ${report.linkLabelsMatched}, volné popisky: ${report.freeLabels}`);
+  if (report.remoteLinksJoined) console.log(`Spojené vzdálené spoje: ${report.remoteLinksJoined}`);
   if (report.warnings.length) {
     console.log(`\nVarování (${report.warnings.length}):`);
     for (const warning of report.warnings) console.log(`  - ${warning}`);
