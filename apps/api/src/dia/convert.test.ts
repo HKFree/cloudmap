@@ -29,7 +29,7 @@ describe('convertDia', () => {
 
   it('attaches capacity labels to the nearest link and keeps other texts as free labels', () => {
     const { map, report } = convert(sampleDiagram());
-    expect(map.links[0]!.capacity).toBe('250Mbps');
+    expect(map.links[0]).toMatchObject({ capacity: '250Mbps', technology: '' });
     expect(report.linkLabelsMatched).toBe(1);
     expect(map.labels.map((l) => l.text)).toEqual(['Volný popisek']);
   });
@@ -42,13 +42,21 @@ describe('convertDia', () => {
     expect(report.warnings.some((w) => w.includes('L1'))).toBe(true);
   });
 
-  it('creates a new link type for styles missing in the legend', () => {
+  it('names the known 18GHz style that is missing in the legend', () => {
     const { map, report } = convert(
       diagram(cloud('C1', 0, 0, 'A'), cloud('C2', 10, 0, 'B'), line('L1', [4, 1], [10, 1], { stroke: '#ff06b0', from: 'C1', to: 'C2' })),
     );
+    expect(map.linkTypes[0]!.name).toBe('18GHz');
+    expect(report.warnings).toHaveLength(0);
+  });
+
+  it('creates a new link type for styles missing in the legend', () => {
+    const { map, report } = convert(
+      diagram(cloud('C1', 0, 0, 'A'), cloud('C2', 10, 0, 'B'), line('L1', [4, 1], [10, 1], { stroke: '#123456', from: 'C1', to: 'C2' })),
+    );
     expect(map.linkTypes).toHaveLength(1);
-    expect(map.linkTypes[0]!.color).toBe('#ff06b0');
-    expect(report.warnings.some((w) => w.includes('#ff06b0'))).toBe(true);
+    expect(map.linkTypes[0]!.color).toBe('#123456');
+    expect(report.warnings.some((w) => w.includes('#123456'))).toBe(true);
   });
 
   it('treats clouds without background as LAN areas', () => {

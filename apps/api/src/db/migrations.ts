@@ -121,8 +121,25 @@ const initial: Migration = {
   },
 };
 
+const linkTechnology: Migration = {
+  async up(db: Kysely<any>) {
+    for (const table of ['link', 'link_history']) {
+      await db.schema
+        .alterTable(table)
+        .addColumn('technology', 'varchar(255)', (c) => c.notNull().defaultTo(''))
+        .execute();
+    }
+  },
+  async down(db: Kysely<any>) {
+    for (const table of ['link', 'link_history']) {
+      await db.schema.alterTable(table).dropColumn('technology').execute();
+    }
+  },
+};
+
 const migrations: Record<string, Migration> = {
   '0001_initial': initial,
+  '0002_link_technology': linkTechnology,
 };
 
 export async function migrateToLatest(db: Kysely<any>): Promise<void> {

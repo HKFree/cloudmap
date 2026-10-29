@@ -80,6 +80,10 @@ export function linkMidpoint(link: MapLink, from: Point, to: Point): Point {
   return mid;
 }
 
+export function linkLabelPosition(link: MapLink, from: Point, to: Point): Point {
+  return link.labelX !== null && link.labelY !== null ? { x: link.labelX, y: link.labelY } : linkMidpoint(link, from, to);
+}
+
 export function mapBounds(data: MapData, padding = 40): Bounds {
   const b: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const add = (x: number, y: number) => {

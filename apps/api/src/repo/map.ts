@@ -46,7 +46,7 @@ export async function loadMap(db: Db, revisionId?: number): Promise<MapData | nu
   };
 }
 
-async function readTable<T extends VersionedTable>(db: Db, table: T, revisionId?: number): Promise<Row<T>[]> {
+export async function readTable<T extends VersionedTable>(db: Db, table: T, revisionId?: number): Promise<Row<T>[]> {
   const kdb = db as unknown as Kysely<any>;
   if (revisionId === undefined) {
     return kdb.selectFrom(table).selectAll().orderBy('id').execute() as Promise<Row<T>[]>;
@@ -106,6 +106,7 @@ const toLink = (r: Row<'link'>, points: Row<'link_point'>[]): MapLink => ({
   curvature: r.curvature,
   points: points.sort((a, b) => a.seq - b.seq).map(({ x, y }) => ({ x, y })),
   capacity: r.capacity,
+  technology: r.technology,
   labelX: r.label_x,
   labelY: r.label_y,
   note: r.note,
@@ -165,6 +166,7 @@ export const linkRow = (l: MapLink): NewRow<'link'> => ({
   shape: l.shape,
   curvature: l.curvature,
   capacity: l.capacity,
+  technology: l.technology,
   label_x: l.labelX,
   label_y: l.labelY,
   note: l.note,

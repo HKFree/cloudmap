@@ -50,6 +50,7 @@ export interface LinkTable {
   shape: string;
   curvature: number;
   capacity: string;
+  technology: string;
   label_x: number | null;
   label_y: number | null;
   note: string;

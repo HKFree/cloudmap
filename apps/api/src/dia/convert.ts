@@ -11,6 +11,7 @@ import {
   type DiaObject,
   type DiaText,
 } from './parse';
+import { splitLinkLabel } from './link-label';
 
 /** Dia works in centimetres; the original PNG export used 20 px per cm. */
 const PX_PER_CM = 20;
@@ -19,6 +20,11 @@ const MARGIN_PX = 40;
 const LINK_LABEL_DISTANCE_CM = 2.5;
 const LINK_LABEL_PATTERN = /\d\s*(m|g)b|mbit|gbit|mbps|gbps|ghz|mimo/i;
 const LINK_LABEL_MAX_LINES = 3;
+
+/** Styles used in the diagram but missing from its legend, inserted after the given legend row. */
+const EXTRA_LINK_TYPES: Record<string, { name: string; after: string }> = {
+  '#ff06b0': { name: '18GHz', after: '17GHz' },
+};
 
 const LINE_TYPES = new Set(['Standard - Line', 'Standard - Arc', 'Standard - BezierLine', 'Standard - PolyLine']);
 const CLOUD = 'Network - Cloud';
@@ -161,6 +167,7 @@ export function convertDia(objects: DiaObject[], newId: () => string): { map: Im
         curvature: geometry.curvature,
         points: geometry.controlPoints.map(px),
         capacity: '',
+        technology: '',
         labelX: null,
         labelY: null,
         note: '',
@@ -176,9 +183,9 @@ export function convertDia(objects: DiaObject[], newId: () => string): { map: Im
   for (const box of texts) {
     if (box.used) continue;
     const target = isLinkLabel(box.text.string) ? nearestLink(box.center, pending) : undefined;
-    if (target && !target.link.capacity) {
+    if (target && !target.link.capacity && !target.link.technology) {
       const p = px(box.center);
-      target.link.capacity = normalizeLines(box.text.string).join('\n');
+      Object.assign(target.link, splitLinkLabel(box.text.string));
       target.link.labelX = p.x;
       target.link.labelY = p.y;
       linkLabelsMatched++;
@@ -358,17 +365,20 @@ function createLinkTypeMatcher(linkTypes: LinkType[], newId: () => string, warni
 
     let type = best && colorDistance(style.color, best.type.color) < 0.25 ? best.type : undefined;
     if (!type) {
+      const extra = EXTRA_LINK_TYPES[style.color];
       type = {
         id: newId(),
-        name: `Neznámý typ ${style.color}`,
+        name: extra?.name ?? `Neznámý typ ${style.color}`,
         color: style.color,
         width: round(style.width * PX_PER_CM),
         dash: dashPattern(style),
-        description: 'Vytvořeno při importu, styl nebyl v legendě',
-        sortOrder: linkTypes.length,
+        description: '',
+        sortOrder: 0,
       };
-      linkTypes.push(type);
-      warnings.push(`Styl spoje ${style.color} není v legendě, vytvořen typ „${type.name}“`);
+      const afterIndex = extra ? linkTypes.findIndex((t) => t.name === extra.after) : -1;
+      linkTypes.splice(afterIndex >= 0 ? afterIndex + 1 : linkTypes.length, 0, type);
+      linkTypes.forEach((t, i) => (t.sortOrder = i));
+      if (!extra) warnings.push(`Styl spoje ${style.color} není v legendě, vytvořen typ „${type.name}“`);
     }
     const list = widths.get(type.id) ?? [];
     list.push(round(style.width * PX_PER_CM));

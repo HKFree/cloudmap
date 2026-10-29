@@ -1,0 +1,85 @@
+import { describe, expect, it } from 'vitest';
+import type { MapData, MapLink, MapNode } from '@cloudmap/shared';
+import { formatHash, parseHash } from '../hash';
+import { areaMembers, createLink, deleteItem, deleteLinkType, moveItem, moveLinkType } from './operations';
+
+const node = (id: string, x: number, y: number, typeId = 'ap', size = 20): MapNode => ({
+  id, typeId, label: id, x, y, width: size, height: size, fontSize: 12, labelDx: 0, labelDy: 0, note: '',
+});
+
+const link = (id: string, from: string, to: string, patch: Partial<MapLink> = {}): MapLink => ({
+  ...createLink(from, to, 'lt'),
+  id,
+  ...patch,
+});
+
+const map = (nodes: MapNode[], links: MapLink[] = []): MapData => ({
+  revision: null,
+  linkTypes: [
+    { id: 'lt', name: '10GHz', color: '#000000', width: 2, dash: '', description: '', sortOrder: 0 },
+    { id: 'lt2', name: '17GHz', color: '#ff0000', width: 2, dash: '', description: '', sortOrder: 1 },
+  ],
+  nodeTypes: [
+    { id: 'ap', name: 'AP', shape: 'cloud', fillColor: '#75ff75', strokeColor: '#000000', isArea: false, description: '', sortOrder: 0 },
+    { id: 'lan', name: 'LAN', shape: 'cloud', fillColor: '#ffffff', strokeColor: '#000000', isArea: true, description: '', sortOrder: 1 },
+  ],
+  nodes,
+  links,
+  labels: [],
+});
+
+describe('moveItem', () => {
+  it('moves a node and shifts bend points and label of its links proportionally', () => {
+    const start = map(
+      [node('a', 0, 0), node('b', 100, 0)],
+      [link('l', 'a', 'b', { shape: 'bezier', points: [{ x: 25, y: 10 }, { x: 75, y: 10 }], labelX: 50, labelY: 5 })],
+    );
+    const moved = moveItem(start, { kind: 'node', id: 'a' }, 0, 30);
+    expect(moved.nodes[0]).toMatchObject({ x: 0, y: 30 });
+    expect(moved.links[0]!.points).toEqual([{ x: 25, y: 30 }, { x: 75, y: 20 }]);
+    expect(moved.links[0]).toMatchObject({ labelX: 50, labelY: 20 });
+  });
+
+  it('moves members together with an area', () => {
+    const start = map([node('lan', 0, 0, 'lan', 200), node('inside', 30, 20), node('outside', 300, 0)]);
+    expect([...areaMembers(start, start.nodes[0]!)]).toEqual(['inside']);
+    const moved = moveItem(start, { kind: 'node', id: 'lan' }, 10, 10);
+    expect(moved.nodes.map((n) => [n.x, n.y])).toEqual([[10, 10], [40, 30], [300, 0]]);
+  });
+
+  it('places a link label at the link midpoint when dragged for the first time', () => {
+    const start = map([node('a', 0, 0), node('b', 100, 0)], [link('l', 'a', 'b')]);
+    const moved = moveItem(start, { kind: 'linkLabel', id: 'l' }, 0, -10);
+    expect(moved.links[0]).toMatchObject({ labelX: 50, labelY: -10 });
+  });
+});
+
+describe('editing operations', () => {
+  it('deletes a node together with its links', () => {
+    const start = map([node('a', 0, 0), node('b', 1, 0), node('c', 2, 0)], [link('ab', 'a', 'b'), link('bc', 'b', 'c')]);
+    const next = deleteItem(start, { kind: 'node', id: 'a' });
+    expect(next.nodes.map((n) => n.id)).toEqual(['b', 'c']);
+    expect(next.links.map((l) => l.id)).toEqual(['bc']);
+  });
+
+  it('keeps link types that are in use', () => {
+    const start = map([node('a', 0, 0), node('b', 1, 0)], [link('ab', 'a', 'b')]);
+    expect(deleteLinkType(start, 'lt')).toBe(start);
+    expect(deleteLinkType(start, 'lt2').linkTypes.map((t) => t.id)).toEqual(['lt']);
+  });
+
+  it('reorders link types', () => {
+    const next = moveLinkType(map([]), 'lt2', -1);
+    expect(next.linkTypes.map((t) => [t.id, t.sortOrder])).toEqual([['lt2', 0], ['lt', 1]]);
+  });
+});
+
+describe('URL hash', () => {
+  it('round-trips selection and revision', () => {
+    const state = { selection: { kind: 'link' as const, id: '01ABC' }, revision: 5 };
+    expect(formatHash(state)).toBe('#revize=5&spoj=01ABC');
+    expect(parseHash('#revize=5&spoj=01ABC')).toEqual(state);
+    expect(parseHash('')).toEqual({ selection: null, revision: null });
+    expect(parseHash('#uzel=X')).toEqual({ selection: { kind: 'node', id: 'X' }, revision: null });
+  });
+});

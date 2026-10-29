@@ -18,7 +18,22 @@ npm test
 npm run typecheck
 ```
 
-API dokumentace (OpenAPI): `/api/v1/docs`.
+API dokumentace (OpenAPI): `/api/v1/docs`. Hlavní endpointy:
+
+- `GET /api/v1/map[?revision=N]` – celá mapa, aktuální nebo po revizi N
+- `POST /api/v1/changes` – uložení změn jako nové revize (`upsert` / `delete` podle id, `baseRevisionId` chrání proti přepsání cizích změn)
+- `GET /api/v1/revisions` – historie se souhrnem změn
+- `POST /api/v1/revisions/:id/restore` – obnovení starší verze (vznikne nová revize)
+
+## Úpravy mapy
+
+Tlačítko „Upravit mapu“ přepne do editoru: přesun uzlů a popisků tažením (oblast se přesouvá
+i s uzly uvnitř), přidání uzlu, spoje a popisku, úprava vlastností v pravém panelu, správa typů
+spojů, Zpět/Znovu (Ctrl+Z / Ctrl+Shift+Z), mazání klávesou Delete. Změny se drží v prohlížeči
+a až „Uložit“ vytvoří novou revizi.
+
+Vybraný uzel, spoj či zobrazená revize jsou v adrese za `#` (např. `#spoj=…`, `#revize=3`),
+odkaz lze poslat dál a funguje tlačítko Zpět v prohlížeči.
 
 ## Kontejner (podman i docker)
 
