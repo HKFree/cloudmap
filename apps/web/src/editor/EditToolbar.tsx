@@ -4,7 +4,7 @@ import type { Editor } from './useEditor';
 export type Tool = 'select' | 'addNode' | 'addLink' | 'addLabel';
 
 const tools: { id: Tool; name: string; hint: string }[] = [
-  { id: 'select', name: 'Výběr', hint: 'Klikněte na prvek pro úpravu, tažením jej přesunete.' },
+  { id: 'select', name: 'Výběr', hint: 'Klik vybere, tažení přesune.' },
   { id: 'addNode', name: '+ Uzel', hint: 'Klikněte do mapy, kam uzel umístit.' },
   { id: 'addLink', name: '+ Spoj', hint: 'Klikněte postupně na dva uzly, které spoj propojí.' },
   { id: 'addLabel', name: '+ Popisek', hint: 'Klikněte do mapy, kam popisek umístit.' },
@@ -74,9 +74,21 @@ export function EditToolbar(props: Props) {
           ))}
         </select>
       )}
-      <p className="hint">
-        {hint} Delete smaže vybraný prvek, Esc zruší akci.
-      </p>
+      <p className="hint">{hint}</p>
+      <ul className="shortcuts">
+        <li>
+          <kbd>Del</kbd> smazat
+        </li>
+        <li>
+          <kbd>Esc</kbd> zrušit
+        </li>
+        <li>
+          <kbd>Ctrl</kbd>+<kbd>Z</kbd> zpět
+        </li>
+        <li>
+          <kbd>Ctrl</kbd>+<kbd>⇧</kbd>+<kbd>Z</kbd> znovu
+        </li>
+      </ul>
 
       <input
         className="message-input"

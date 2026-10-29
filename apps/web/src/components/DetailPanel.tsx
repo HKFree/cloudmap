@@ -201,7 +201,7 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
           </Field>
           {link.labelX !== null && (
             <button type="button" onClick={() => edit({ labelX: null, labelY: null }, 'label-reset')}>
-              Popisek doprostřed spoje
+              Vycentrovat popisek spoje
             </button>
           )}
           <button type="button" className="danger" onClick={() => onDelete({ kind: 'link', id: link.id })}>

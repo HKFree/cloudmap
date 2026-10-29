@@ -121,6 +121,9 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
     const target = targetOf(event.target);
     pressedTarget.current = target;
     if (!editing || !canDrag || event.button !== 0 || !isDraggable(target)) return;
+    // Without this the browser starts selecting text under the moving pointer and may
+    // then begin a native drag of the selection, which cancels our drag midway.
+    event.preventDefault();
     drag.current = { target, start: toMap(event.clientX, event.clientY), client: { x: event.clientX, y: event.clientY }, moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
     props.onDragStart(target);
@@ -171,6 +174,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
       onPointerCancel={onPointerUp}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      onDragStart={(event) => event.preventDefault()}
     >
       <g ref={layerRef}>
         <Layers data={data} highlight={highlight} interactive editing={editing} />

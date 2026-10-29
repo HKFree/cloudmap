@@ -17,7 +17,7 @@ export function LinkTypesPanel({ data, editor }: { data: MapData; editor: Editor
     editor.apply((m) => patchItem(m, 'linkTypes', type.id, patch), `linkType:${type.id}:${field}`);
 
   return (
-    <details className="panel" open>
+    <details className="panel">
       <summary>Typy spojů</summary>
       <ul className="type-list">
         {data.linkTypes.map((type, index) => {

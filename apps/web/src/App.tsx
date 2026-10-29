@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { assignReadableIds, diffMaps, type MapData, type Point } from '@cloudmap/shared';
 import { fetchMap, restoreRevision, saveChanges } from './api';
 import { DetailPanel } from './components/DetailPanel';
-import { Footer } from './components/Footer';
+import { AppInfo } from './components/AppInfo';
 import { HistoryPanel } from './components/HistoryPanel';
 import { SearchBox } from './components/SearchBox';
 import { EditToolbar, type Tool } from './editor/EditToolbar';
@@ -240,24 +240,12 @@ export function App() {
           ☰
         </button>
         <h1>
-          hkfree <span>cloudmap</span>
+          <img src="/logo.svg" alt="hkfree" height={44} /> <span>cloudmap</span>
         </h1>
         {shown && <SearchBox nodes={shown.nodes} onSelect={(node) => select({ kind: 'node', id: node.id }, true)} />}
-        <button type="button" onClick={() => mapRef.current?.fit()} disabled={!shown}>
-          Celá mapa
+        <button type="button" onClick={() => mapRef.current?.fit()} disabled={!shown} title="Zobrazit celou mapu">
+          Vycentrovat
         </button>
-        <span className="spacer" />
-        <button type="button" className={showHistory ? 'active' : undefined} onClick={() => {
-            setShowHistory((v) => !v);
-            setShowSidebar(true);
-          }}>
-          Historie
-        </button>
-        {!editing && (
-          <button type="button" className="primary" onClick={startEditing} disabled={!current}>
-            Upravit mapu
-          </button>
-        )}
       </header>
 
       {!editing && revision && (
@@ -283,6 +271,17 @@ export function App() {
       <div className="workspace">
         {shown && showSidebar && (
           <aside className="sidebar">
+            <div className="toolbar-row">
+              <button type="button" className={showHistory ? 'active' : undefined} onClick={() => setShowHistory((v) => !v)}>
+                Historie
+              </button>
+              <span className="spacer" />
+              {!editing && (
+                <button type="button" className="primary" onClick={startEditing} disabled={!current}>
+                  Upravit mapu
+                </button>
+              )}
+            </div>
             {editing && (
               <EditToolbar
                 data={shown}
@@ -337,6 +336,7 @@ export function App() {
               </svg>
               <p className="hint">Kliknutím na typ spoje jej skryjete nebo zobrazíte.</p>
             </details>
+            <AppInfo data={shown} />
           </aside>
         )}
         <main className="main">
@@ -363,8 +363,6 @@ export function App() {
           )}
         </main>
       </div>
-
-      <Footer data={shown} />
     </div>
   );
 }

@@ -48,6 +48,9 @@ button:disabled {
 }
 
 .header h1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   font-size: 20px;
   color: var(--accent);
@@ -69,6 +72,14 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 6px;
   font: inherit;
+}
+
+.search-shortcut {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .search-results {
@@ -95,6 +106,7 @@ button:disabled {
   padding: 6px 10px;
 }
 
+.search-results button.active,
 .search-results button:hover {
   background: #f0f3f6;
 }
@@ -118,6 +130,9 @@ button:disabled {
   height: 100%;
   display: block;
   cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
 .map-canvas:active {
@@ -269,16 +284,20 @@ dd {
   font-size: 12px;
 }
 
-.footer {
+.app-info {
+  margin-top: auto;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 16px;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
   border-top: 1px solid var(--border);
-  font-size: 13px;
 }
 
-.footer .spacer {
+.app-info a {
+  color: #0969da;
+}
+
+.spacer {
   flex: 1;
 }
 
@@ -561,4 +580,28 @@ button.danger {
 
 .field.hint {
   justify-content: flex-end;
+}
+
+.shortcuts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 5px;
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+  color: #1f2328;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-bottom-width: 2px;
+  border-radius: 4px;
 }
