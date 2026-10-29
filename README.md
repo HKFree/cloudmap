@@ -36,7 +36,12 @@ Tlačítko „Upravit mapu“ přepne do editoru (ovládání je v levém panelu
 - přidání uzlu, spoje a popisku, úprava vlastností, správa typů spojů
 - Zpět/Znovu (Ctrl+Z / Ctrl+Shift+Z), mazání klávesou Delete
 
-Změny se drží v prohlížeči a až „Uložit“ vytvoří novou revizi.
+Změny se drží v prohlížeči a až „Uložit“ vytvoří novou revizi. Před uložením proběhne kontrola sítě:
+spoje s nepřipojeným koncem a lokality bez cesty do centrálního uzlu **4 PMV IGW** (id `4-pmv-igw`,
+nelze jej smazat) se zvýrazní a vypíšou, nově vzniklé problémy zvlášť. Uložit lze i přesto.
+
+V historii se po kliknutí na revizi zvýrazní, co změnila: přidané zeleně, změněné oranžově
+(se seznamem změněných vlastností) a smazané jako červený přerušovaný obrys.
 
 Typ spoje označený jako **vzdálený spoj** (např. „datová konektivita“, pronajatá optika mimo síť
 hkfree) se nekreslí přes celou mapu, ale jen jako krátké konce u obou uzlů s názvem protější

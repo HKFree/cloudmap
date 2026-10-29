@@ -605,3 +605,69 @@ kbd {
   border-bottom-width: 2px;
   border-radius: 4px;
 }
+
+.change-legend {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+}
+
+.change-legend .swatch {
+  height: 8px;
+}
+
+.change-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.change-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.change-sign {
+  width: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+button.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #0969da;
+  text-align: left;
+}
+
+.badge.new {
+  background: var(--accent);
+}
+
+.check-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-color: #ff8182;
+  background: #fff5f5;
+}
+
+.check-panel.ok {
+  border-color: #4ac26b;
+  background: #f0fff4;
+}
+
+.check-panel .toolbar-row {
+  margin-top: 8px;
+}
+
+.older-problems > summary {
+  cursor: pointer;
+  margin: 2px 0;
+}

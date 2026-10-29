@@ -9,6 +9,8 @@ export interface MapHighlight {
   /** First node picked when drawing a new link. */
   pendingNodeId?: string | null;
   hiddenLinkTypeIds?: ReadonlySet<string>;
+  /** When set, everything else is dimmed (e.g. unchanged items in a revision view), also while editing. */
+  emphasis?: { nodes: ReadonlySet<string>; links: ReadonlySet<string> } | null;
 }
 
 interface Props {
@@ -36,7 +38,7 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
   const selection = highlight.selection ?? null;
 
   // Dimming helps to read a selection in view mode but gets in the way while editing.
-  const focus = editing ? undefined : focusSet(data, visibleLinks, selection);
+  const focus = highlight.emphasis ?? (editing ? undefined : focusSet(data, visibleLinks, selection));
   const nodeOpacity = (id: string) => (focus && !focus.nodes.has(id) ? DIMMED : 1);
   const linkOpacity = (id: string) => (focus && !focus.links.has(id) ? DIMMED : 1);
   const isSelected = (kind: ItemRef['kind'], id: string) =>

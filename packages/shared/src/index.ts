@@ -171,3 +171,4 @@ export type SaveChanges = z.input<typeof saveChangesSchema>;
 
 export { diffMaps, countChanges } from './diff';
 export { assignReadableIds, isTemporaryId, slugify, temporaryId, uniqueId } from './ids';
+export { CORE_NODE_ID, checkTopology, hasTopologyProblems, linkedNodeIds, type TopologyProblems } from './topology';

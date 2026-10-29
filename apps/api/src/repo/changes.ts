@@ -1,4 +1,4 @@
-import type { MapChanges, Revision } from '@cloudmap/shared';
+import { CORE_NODE_ID, type MapChanges, type Revision } from '@cloudmap/shared';
 import type { Db } from '../db/connection';
 import { versionedTables, type NewRow, type VersionedTable } from '../db/schema';
 import { labelRow, linkPointRows, linkRow, linkTypeRow, nodeRow, nodeTypeRow, readTable } from './map';
@@ -16,6 +16,7 @@ const DEFAULT_MESSAGE = 'Úprava mapy';
 
 /** Applies changes made in the editor as one new revision. */
 export async function saveChanges(db: Db, input: SaveInput): Promise<Revision> {
+  if (input.delete.nodes.includes(CORE_NODE_ID)) throw coreNodeError();
   for (const link of input.upsert.links) {
     if (link.fromNodeId === link.toNodeId) throw new ValidationError('Spoj nemůže vést z uzlu do téhož uzlu.');
   }
@@ -70,10 +71,13 @@ export async function restoreRevision(db: Db, revisionId: number, message: strin
         setRows(changeset, table, pastRows.filter((row) => currentById.get(row.id) !== stableJson(row)));
         changeset.delete[table] = current.filter((row) => !pastIds.has(row.id)).map((row) => row.id);
       }
+      if (changeset.delete.node?.includes(CORE_NODE_ID)) throw coreNodeError();
       return changeset;
     }),
   );
 }
+
+const coreNodeError = () => new ValidationError('Centrální uzel 4 PMV IGW nelze smazat.');
 
 function setRows<T extends VersionedTable>(changeset: Required<Changeset>, table: T, rows: NewRow<T>[]) {
   (changeset.upsert as Record<string, unknown>)[table] = rows;

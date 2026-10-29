@@ -6,6 +6,7 @@ import { itemOf, type DragRef, type ItemRef } from '../editor/operations';
 import { EditHandles } from './EditHandles';
 import { mapBounds, type Bounds } from './geometry';
 import { MapLayers, type MapHighlight } from './MapSvg';
+import { Ghosts, MarkHalos, type MapMarks } from './MarksOverlay';
 
 export interface MapViewHandle {
   focus: (bounds: Bounds) => void;
@@ -18,6 +19,7 @@ type Target = { kind: ItemRef['kind'] | DragRef['kind']; id: string };
 interface Props {
   data: MapData;
   highlight: MapHighlight;
+  marks?: MapMarks | null;
   editing: boolean;
   /** Dragging items is possible only in edit mode with this flag on. */
   canDrag: boolean;
@@ -46,6 +48,7 @@ const isDraggable = (target: Target | null): target is DragRef => target !== nul
 
 /** The map itself re-renders only when data or highlight change, not on every zoom step. */
 const Layers = memo(MapLayers);
+const Halos = memo(MarkHalos);
 
 export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, ref) {
   const { data, highlight, editing, canDrag, cursorClass } = props;
@@ -177,7 +180,9 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
       onDragStart={(event) => event.preventDefault()}
     >
       <g ref={layerRef}>
+        {props.marks && <Halos data={data} marks={props.marks} />}
         <Layers data={data} highlight={highlight} interactive editing={editing} />
+        {props.marks?.ghosts && <Ghosts ghosts={props.marks.ghosts} />}
         {editing && <EditHandles data={data} selection={highlight.selection ?? null} zoom={zoomLevel} />}
       </g>
     </svg>

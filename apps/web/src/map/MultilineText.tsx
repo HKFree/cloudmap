@@ -11,6 +11,7 @@ interface Props {
   align?: LabelAlign;
   /** Colour of an outline behind the glyphs that keeps text readable over lines. */
   halo?: string;
+  haloWidth?: number;
   opacity?: number;
   /** Interactive text can be clicked and dragged; otherwise clicks pass through. */
   interactive?: boolean;
@@ -30,7 +31,7 @@ export function textBlockWidth(text: string, fontSize: number, bold = false): nu
 }
 const anchors = { left: 'start', center: 'middle', right: 'end' } as const;
 
-export function MultilineText({ x, y, text, fontSize, bold, fill = '#000000', align = 'center', halo, opacity, interactive }: Props) {
+export function MultilineText({ x, y, text, fontSize, bold, fill = '#000000', align = 'center', halo, haloWidth = 4, opacity, interactive }: Props) {
   const lines = text.split('\n');
   const firstLineOffset = (-(lines.length - 1) / 2) * fontSize * LINE_HEIGHT;
   return (
@@ -45,7 +46,7 @@ export function MultilineText({ x, y, text, fontSize, bold, fill = '#000000', al
       opacity={opacity}
       pointerEvents={interactive ? 'visiblePainted' : 'none'}
       style={interactive ? { userSelect: 'none' } : undefined}
-      {...(halo ? { stroke: halo, strokeWidth: 4, paintOrder: 'stroke', strokeLinejoin: 'round' as const } : {})}
+      {...(halo ? { stroke: halo, strokeWidth: haloWidth, paintOrder: 'stroke', strokeLinejoin: 'round' as const } : { stroke: 'none' })}
     >
       {lines.map((line, i) => (
         <tspan key={i} x={x} dy={i === 0 ? firstLineOffset : fontSize * LINE_HEIGHT}>

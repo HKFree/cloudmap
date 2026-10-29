@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { MapData } from '@cloudmap/shared';
+import { CORE_NODE_ID, type MapData } from '@cloudmap/shared';
 import { buildApp } from '../app';
 import { openDatabase, type Db } from '../db/connection';
 import { importDia } from '../dia/import';
@@ -59,6 +59,13 @@ describe('editing API', () => {
     const response = await save({ baseRevisionId: 1, delete: { nodes: [link.fromNodeId], links: [link.id] } });
     expect(response.statusCode).toBe(201);
     expect((await getMap()).links).toHaveLength(0);
+  });
+
+  it('refuses to delete the core node', async () => {
+    const core = { ...(await getMap()).nodes[0]!, id: CORE_NODE_ID };
+    expect((await save({ baseRevisionId: 1, upsert: { nodes: [core] } })).statusCode).toBe(201);
+    const response = await save({ baseRevisionId: 2, delete: { nodes: [CORE_NODE_ID] } });
+    expect(response.statusCode).toBe(422);
   });
 
   it('adds a new link type', async () => {

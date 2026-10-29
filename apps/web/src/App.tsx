@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { assignReadableIds, diffMaps, type MapData, type Point } from '@cloudmap/shared';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { assignReadableIds, checkTopology, CORE_NODE_ID, diffMaps, hasTopologyProblems, linkedNodeIds, type MapData, type Point } from '@cloudmap/shared';
 import { fetchMap, restoreRevision, saveChanges } from './api';
 import { DetailPanel } from './components/DetailPanel';
 import { AppInfo } from './components/AppInfo';
@@ -7,12 +7,16 @@ import { HistoryPanel } from './components/HistoryPanel';
 import { SearchBox } from './components/SearchBox';
 import { EditToolbar, type Tool } from './editor/EditToolbar';
 import { LinkTypesPanel } from './editor/LinkTypesPanel';
+import { TopologyCheckPanel } from './editor/TopologyCheckPanel';
 import { createLabel, createLink, createNode, deleteItem, moveItem, removeLinkPoint, upsertItem, type ItemRef } from './editor/operations';
 import { useEditor } from './editor/useEditor';
 import { useHashState } from './hash';
+import { describeRevision, emptyMap, itemRefOf, type ItemChange } from './history/revisionChanges';
+import { RevisionChangesPanel } from './history/RevisionChangesPanel';
 import type { Bounds } from './map/geometry';
 import { Legend, LEGEND_WIDTH, legendHeight } from './map/Legend';
 import { MapView, type MapViewHandle } from './map/MapView';
+import { MARK_COLORS, type MapMarks } from './map/MarksOverlay';
 
 const dateFormat = new Intl.DateTimeFormat('cs-CZ', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -57,6 +61,9 @@ export function App() {
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [checkingBeforeSave, setCheckingBeforeSave] = useState(false);
+  const [previousOfViewed, setPreviousOfViewed] = useState<MapData | null>(null);
+  const [dimUnchanged, setDimUnchanged] = useState(true);
 
   const { state: hashState, navigationId, navigate } = useHashState();
   const { selection, revision } = hashState;
@@ -75,8 +82,67 @@ export function App() {
 
   useEffect(() => {
     setViewed(null);
-    if (revision) fetchMap(revision).then(setViewed).catch((e: Error) => setError(e.message));
+    setPreviousOfViewed(null);
+    if (!revision) return;
+    // The state right before the revision is needed to show what the revision changed.
+    Promise.all([fetchMap(revision), revision > 1 ? fetchMap(revision - 1) : emptyMap()])
+      .then(([map, previous]) => {
+        setViewed(map);
+        setPreviousOfViewed(previous);
+      })
+      .catch((e: Error) => setError(e.message));
   }, [revision]);
+
+  const revisionChanges = useMemo(
+    () => (viewed && previousOfViewed ? describeRevision(previousOfViewed, viewed) : null),
+    [viewed, previousOfViewed],
+  );
+
+  const baseLinked = useMemo(() => (editor.base ? linkedNodeIds(editor.base) : new Set<string>()), [editor.base]);
+  const topology = useMemo(
+    () => (checkingBeforeSave && editor.draft ? checkTopology(editor.draft, baseLinked) : null),
+    [checkingBeforeSave, editor.draft, baseLinked],
+  );
+  const baseTopology = useMemo(() => (checkingBeforeSave && editor.base ? checkTopology(editor.base) : null), [checkingBeforeSave, editor.base]);
+
+  const marks = useMemo((): MapMarks | null => {
+    if (editing && topology) {
+      return {
+        nodes: new Map(topology.unreachableNodes.map((id) => [id, MARK_COLORS.problem])),
+        links: new Map(topology.looseLinks.map((id) => [id, MARK_COLORS.problem])),
+        labels: new Map(),
+      };
+    }
+    if (!editing && revisionChanges && previousOfViewed) {
+      const byCollection = (collection: ItemChange['collection']) =>
+        new Map(revisionChanges.filter((c) => c.collection === collection && c.kind !== 'deleted').map((c) => [c.id, MARK_COLORS[c.kind]]));
+      const deleted = (collection: ItemChange['collection']) =>
+        revisionChanges.filter((c) => c.collection === collection && c.kind === 'deleted').map((c) => c.id);
+      return {
+        nodes: byCollection('nodes'),
+        links: byCollection('links'),
+        labels: byCollection('labels'),
+        ghosts: { map: previousOfViewed, nodes: deleted('nodes'), links: deleted('links'), labels: deleted('labels'), color: MARK_COLORS.deleted },
+      };
+    }
+    return null;
+  }, [editing, topology, revisionChanges, previousOfViewed]);
+
+  const emphasis = useMemo(() => {
+    if (!marks || (!editing && !dimUnchanged)) return null;
+    const nodes = new Set(marks.nodes.keys());
+    const links = new Set(marks.links.keys());
+    // Keep the ends of highlighted and deleted links readable, as well as the selection.
+    const ghostLinks = new Set(marks.ghosts?.links);
+    for (const link of [...(shown?.links ?? []), ...(marks.ghosts?.map.links ?? [])]) {
+      if (!links.has(link.id) && !ghostLinks.has(link.id)) continue;
+      nodes.add(link.fromNodeId);
+      nodes.add(link.toNodeId);
+    }
+    if (selection?.kind === 'node') nodes.add(selection.id);
+    if (selection?.kind === 'link') links.add(selection.id);
+    return { nodes, links };
+  }, [marks, editing, dimUnchanged, shown, selection]);
 
   const focusItem = (item: ItemRef, map: MapData | null = shown) => {
     const bounds = map && itemBounds(map, item);
@@ -119,6 +185,7 @@ export function App() {
 
   const finishEditing = () => {
     if (editor.changeCount > 0 && !confirm('Máte neuložené změny. Opravdu je zahodit?')) return;
+    setCheckingBeforeSave(false);
     editor.stop();
     changeTool('select');
   };
@@ -126,6 +193,13 @@ export function App() {
   const discardChanges = () => {
     if (!editor.base || !confirm('Zahodit všechny neuložené změny?')) return;
     editor.start(editor.base);
+  };
+
+  /** Saving first checks the network; problems are shown and the user decides whether to save anyway. */
+  const requestSave = () => {
+    if (!editor.draft) return;
+    if (hasTopologyProblems(checkTopology(editor.draft, baseLinked))) setCheckingBeforeSave(true);
+    else void save();
   };
 
   const save = async () => {
@@ -138,6 +212,7 @@ export function App() {
       await saveChanges({ baseRevisionId: editor.base.revision?.id ?? null, message, ...diffMaps(editor.base, draft) });
       editor.start(await reload());
       setMessage('');
+      setCheckingBeforeSave(false);
       const renamedSelection = selection && renamed.get(selection.id);
       if (renamedSelection) navigate({ selection: { ...selection, id: renamedSelection }, revision }, { replace: true });
     } catch (e) {
@@ -159,6 +234,10 @@ export function App() {
   };
 
   const deleteSelected = (item: ItemRef) => {
+    if (item.kind === 'node' && item.id === CORE_NODE_ID) {
+      alert('Centrální uzel 4 PMV IGW nelze smazat, kontrola sítě k němu hledá cesty.');
+      return;
+    }
     editor.apply((m) => deleteItem(m, item));
     navigate({ selection: null, revision }, { replace: true });
   };
@@ -221,6 +300,8 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
+  const isLatestViewed = revision !== null && revision === current?.revision?.id;
+
   const toggleLinkType = (id: string) =>
     setHiddenLinkTypes((prev) => {
       const next = new Set(prev);
@@ -252,18 +333,21 @@ export function App() {
         <div className="banner">
           {viewed?.revision ? (
             <>
-              Prohlížíte starší verzi mapy: revize #{viewed.revision.id} z {dateFormat.format(new Date(viewed.revision.createdAt))}
+              {isLatestViewed ? 'Aktuální verze mapy' : 'Prohlížíte starší verzi mapy'}: revize #{viewed.revision.id} z{' '}
+              {dateFormat.format(new Date(viewed.revision.createdAt))}
               {viewed.revision.message && ` – ${viewed.revision.message}`}
             </>
           ) : (
             <>Načítám revizi #{revision}…</>
           )}
           <span className="spacer" />
-          <button type="button" onClick={restore} disabled={!viewed}>
-            Obnovit tuto verzi
-          </button>
+          {!isLatestViewed && (
+            <button type="button" onClick={restore} disabled={!viewed}>
+              Obnovit tuto verzi
+            </button>
+          )}
           <button type="button" onClick={() => navigate({ selection, revision: null })}>
-            Zobrazit aktuální
+            {isLatestViewed ? 'Skrýt změny' : 'Zobrazit aktuální'}
           </button>
         </div>
       )}
@@ -296,9 +380,35 @@ export function App() {
                 onMessageChange={setMessage}
                 saving={saving}
                 error={saveError}
-                onSave={save}
+                onSave={requestSave}
                 onDiscard={discardChanges}
                 onFinish={finishEditing}
+              />
+            )}
+            {editing && topology && baseTopology && (
+              <TopologyCheckPanel
+                data={shown}
+                problems={topology}
+                previous={baseTopology}
+                saving={saving}
+                onShow={(item) => select(item, true)}
+                onSave={save}
+                onCancel={() => setCheckingBeforeSave(false)}
+              />
+            )}
+            {!editing && revision && (
+              <RevisionChangesPanel
+                revisionId={revision}
+                changes={revisionChanges}
+                dimUnchanged={dimUnchanged}
+                onDimUnchangedChange={setDimUnchanged}
+                onShow={(change) => {
+                  const item = itemRefOf(change);
+                  if (!item) return;
+                  // Deleted items exist only in the previous state, so they can be shown but not selected.
+                  if (change.kind === 'deleted') focusItem(item, previousOfViewed);
+                  else select(item, true);
+                }}
               />
             )}
             {showHistory && (
@@ -349,7 +459,8 @@ export function App() {
             <MapView
               ref={mapRef}
               data={shown}
-              highlight={{ selection, pendingNodeId: pendingFrom, hiddenLinkTypeIds: hiddenLinkTypes }}
+              highlight={{ selection, pendingNodeId: pendingFrom, hiddenLinkTypeIds: hiddenLinkTypes, emphasis }}
+              marks={marks}
               editing={editing}
               canDrag={tool === 'select'}
               cursorClass={tool !== 'select' ? 'tool-add' : undefined}

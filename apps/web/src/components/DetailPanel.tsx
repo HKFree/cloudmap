@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { linkShapes, type LinkShape, type MapData, type MapLabel, type MapLink, type MapNode } from '@cloudmap/shared';
+import { CORE_NODE_ID, linkShapes, type LinkShape, type MapData, type MapLabel, type MapLink, type MapNode } from '@cloudmap/shared';
 import { areaMembers, changeLinkShape, DEFAULT_CORNER_RADIUS, isArea, patchItem, type ItemRef } from '../editor/operations';
 import { textBlockWidth } from '../map/MultilineText';
 import type { Editor } from '../editor/useEditor';
@@ -72,9 +72,13 @@ function NodeDetail({ data, node, editor, onSelect, onDelete, onClose }: Props &
           <Field label="Poznámka">
             <textarea rows={3} value={node.note} onChange={(e) => edit({ note: e.target.value }, 'note')} />
           </Field>
-          <button type="button" className="danger" onClick={() => onDelete({ kind: 'node', id: node.id })}>
-            Smazat uzel{links.length > 0 && ` i se spoji (${links.length})`}
-          </button>
+          {node.id === CORE_NODE_ID ? (
+            <p className="hint">Centrální uzel sítě, nelze jej smazat.</p>
+          ) : (
+            <button type="button" className="danger" onClick={() => onDelete({ kind: 'node', id: node.id })}>
+              Smazat uzel{links.length > 0 && ` i se spoji (${links.length})`}
+            </button>
+          )}
         </div>
       ) : (
         <>

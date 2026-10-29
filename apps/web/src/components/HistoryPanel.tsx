@@ -52,10 +52,10 @@ export function HistoryPanel({ viewedRevision, latestRevision, onView, onClose }
       <ol className="revision-list">
         {revisions?.map((revision) => {
           const isLatest = revision.id === latestRevision;
-          const isViewed = viewedRevision === null ? isLatest : revision.id === viewedRevision;
+          const isViewed = revision.id === viewedRevision;
           return (
             <li key={revision.id} className={isViewed ? 'active' : undefined}>
-              <button type="button" onClick={() => onView(isLatest ? null : revision.id)}>
+              <button type="button" onClick={() => onView(revision.id)}>
                 <strong>#{revision.id}</strong> {revision.message || '(bez popisu)'}
                 {isLatest && <span className="badge">aktuální</span>}
               </button>
