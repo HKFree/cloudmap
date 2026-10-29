@@ -16,7 +16,7 @@ describe('editing API', () => {
   beforeEach(async () => {
     db = await openDatabase('sqlite::memory:');
     await importDia(db, sampleDiagram());
-    app = await buildApp({ db, version: 'test' });
+    app = await buildApp({ db, version: 'test', auth: { devMode: true, apiKeys: [] } });
   });
 
   afterEach(async () => {

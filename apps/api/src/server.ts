@@ -1,9 +1,11 @@
 import { buildApp } from './app';
-import { config } from './config';
+import { config, loadAuthConfig } from './config';
 import { openDatabase } from './db/connection';
 
+const auth = loadAuthConfig();
 const db = await openDatabase(config.databaseUrl);
-const app = await buildApp({ db, version: config.version, staticDir: config.staticDir, logger: true });
+const app = await buildApp({ db, version: config.version, auth, staticDir: config.staticDir, logger: true });
+if (auth.devMode) app.log.warn('DEV_MODE: login is disabled, changes are recorded as made by "dev"');
 
 const shutdown = async () => {
   await app.close();

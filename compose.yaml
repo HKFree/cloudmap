@@ -15,6 +15,14 @@ services:
         APP_VERSION: ${APP_VERSION:-}
     ports:
       - "0.0.0.0:${CLOUDMAP_PORT:-8080}:8080"
+    # Values come from the shell or a .env file next to this file (see .env.example).
+    environment:
+      DEV_MODE: ${DEV_MODE:-false}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
     volumes:
       - cloudmap-data:/data
     restart: unless-stopped

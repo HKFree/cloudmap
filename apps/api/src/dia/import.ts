@@ -44,7 +44,7 @@ export async function importDia(db: Db, xml: string, options: ImportOptions = {}
   const changed = versionedTables.some((t) => changes.upsert[t]!.length > 0 || changes.delete[t]!.length > 0);
   if (!changed) return { revision: null, report };
 
-  const revision = await commitChanges(db, { message: options.message ?? 'Import z Dia diagramu' }, changes);
+  const revision = await commitChanges(db, { message: options.message ?? 'Import z Dia diagramu', author: 'import' }, changes);
   return { revision, report };
 }
 
