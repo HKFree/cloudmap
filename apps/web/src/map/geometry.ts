@@ -51,10 +51,37 @@ export function linkPath(link: MapLink, from: Point, to: Point): string {
       return d;
     }
     case 'polyline':
-      return [from, ...link.points, to].map((p, i) => `${i === 0 ? 'M' : 'L'}${fmt(p)}`).join('');
+      return polylinePath([from, ...link.points, to], link.cornerRadius);
     default:
       return `M${fmt(from)}L${fmt(to)}`;
   }
+}
+
+/** Corners are rounded with a quadratic curve that starts `radius` px before the vertex. */
+function polylinePath(points: Point[], radius: number): string {
+  let d = `M${fmt(points[0]!)}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const [prev, corner, next] = [points[i - 1]!, points[i]!, points[i + 1]!];
+    const r = Math.min(radius, distance(prev, corner) / 2, distance(corner, next) / 2);
+    if (r <= 0) {
+      d += `L${fmt(corner)}`;
+      continue;
+    }
+    d += `L${fmt(towards(corner, prev, r))}Q${fmt(corner)} ${fmt(towards(corner, next, r))}`;
+  }
+  return `${d}L${fmt(points[points.length - 1]!)}`;
+}
+
+export const STUB_LENGTH = 120;
+
+/**
+ * Outer ends of the two stubs of a remote link: stored in `points` once moved,
+ * otherwise pointing from each node towards the other one.
+ */
+export function stubEnds(link: MapLink, from: Point, to: Point): [Point, Point] {
+  if (link.points.length === 2) return [link.points[0]!, link.points[1]!];
+  const length = Math.min(STUB_LENGTH, distance(from, to) * 0.4);
+  return [towards(from, to, length), towards(to, from, length)];
 }
 
 /** Positive curvature bulges to the left of the from→to direction, which is a clockwise sweep on screen. */
@@ -100,6 +127,14 @@ export function mapBounds(data: MapData, padding = 40): Bounds {
   for (const l of data.labels) add(l.x, l.y);
   if (!Number.isFinite(b.minX)) return { minX: 0, minY: 0, maxX: 1000, maxY: 1000 };
   return { minX: b.minX - padding, minY: b.minY - padding, maxX: b.maxX + padding, maxY: b.maxY + padding };
+}
+
+export const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/** Point at `length` from `from` in the direction of `to`. */
+export function towards(from: Point, to: Point, length: number): Point {
+  const d = distance(from, to) || 1;
+  return { x: from.x + ((to.x - from.x) / d) * length, y: from.y + ((to.y - from.y) / d) * length };
 }
 
 const fmt = (p: Point) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`;

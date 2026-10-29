@@ -17,6 +17,17 @@ interface Props {
 }
 
 const LINE_HEIGHT = 1.15;
+export const FONT_FAMILY = 'Helvetica, Arial, sans-serif';
+
+let measureContext: CanvasRenderingContext2D | null = null;
+
+/** Width of the widest line as the browser renders it. */
+export function textBlockWidth(text: string, fontSize: number, bold = false): number {
+  measureContext ??= document.createElement('canvas').getContext('2d');
+  if (!measureContext) return 0;
+  measureContext.font = `${bold ? 'bold ' : ''}${fontSize}px ${FONT_FAMILY}`;
+  return Math.max(0, ...text.split('\n').map((line) => measureContext!.measureText(line).width));
+}
 const anchors = { left: 'start', center: 'middle', right: 'end' } as const;
 
 export function MultilineText({ x, y, text, fontSize, bold, fill = '#000000', align = 'center', halo, opacity, interactive }: Props) {

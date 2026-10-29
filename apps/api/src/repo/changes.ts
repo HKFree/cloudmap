@@ -80,7 +80,7 @@ function setRows<T extends VersionedTable>(changeset: Required<Changeset>, table
 }
 
 /** Column order differs between live and history tables, so compare with sorted keys. */
-const stableJson = (row: object) => JSON.stringify(Object.entries(row).sort(([a], [b]) => a.localeCompare(b)));
+export const stableJson = (row: object) => JSON.stringify(Object.entries(row).sort(([a], [b]) => a.localeCompare(b)));
 
 function withoutHistoryColumns<T extends { id: string }>(row: T): T {
   const { valid_from_rev: _from, valid_to_rev: _to, ...rest } = row as T & Record<string, unknown>;

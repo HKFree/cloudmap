@@ -18,7 +18,7 @@ describe('revisions', () => {
 
   it('imports a diagram as the first revision', async () => {
     const { revision } = await importDia(db, sampleDiagram());
-    expect(revision.id).toBe(1);
+    expect(revision?.id).toBe(1);
     const map = await loadMap(db);
     expect(map?.links).toHaveLength(1);
     expect(map?.revision?.id).toBe(1);
@@ -27,9 +27,16 @@ describe('revisions', () => {
   it('refuses to import over an existing map unless replace is set', async () => {
     await importDia(db, sampleDiagram());
     await expect(importDia(db, sampleDiagram())).rejects.toThrow(/--replace/);
+    const { revision } = await importDia(db, sampleDiagram().replace('Volný popisek', 'Jiný popisek'), { replace: true });
+    expect(revision?.id).toBe(2);
+    expect((await loadMap(db))?.labels.map((l) => l.text)).toEqual(['Jiný popisek']);
+  });
+
+  it('creates no revision when the same diagram is imported again', async () => {
+    await importDia(db, sampleDiagram());
     const { revision } = await importDia(db, sampleDiagram(), { replace: true });
-    expect(revision.id).toBe(2);
-    expect((await loadMap(db))?.links).toHaveLength(1);
+    expect(revision).toBeNull();
+    expect(await listRevisions(db)).toHaveLength(1);
   });
 
   it('keeps older states readable after updates and deletes', async () => {

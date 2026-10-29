@@ -26,13 +26,13 @@ describe('editing API', () => {
 
   it('saves edits as a new revision', async () => {
     const map = await getMap();
-    const link = { ...map.links[0]!, capacity: '1Gbps', technology: 'AF-5X', note: 'nový spoj', shape: 'bezier', points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] };
+    const link = { ...map.links[0]!, capacity: '1Gbps', note: 'nový spoj', shape: 'bezier', points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] };
     const response = await save({ baseRevisionId: 1, message: 'Upgrade', upsert: { links: [link] } });
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({ id: 2, message: 'Upgrade' });
 
     const updated = await getMap();
-    expect(updated.links[0]).toMatchObject({ capacity: '1Gbps', technology: 'AF-5X', note: 'nový spoj' });
+    expect(updated.links[0]).toMatchObject({ capacity: '1Gbps', note: 'nový spoj' });
     expect(updated.links[0]!.points).toHaveLength(2);
 
     await save({ baseRevisionId: 2, upsert: { links: [{ ...link, shape: 'straight', points: [] }] } });
@@ -62,7 +62,7 @@ describe('editing API', () => {
   });
 
   it('adds a new link type', async () => {
-    const type = { id: 'lt-new', name: '18GHz', color: '#ff06b0', width: 6, dash: '', description: '', sortOrder: 5 };
+    const type = { id: 'lt-new', name: '18GHz', color: '#ff06b0', width: 6, dash: '', description: '', sortOrder: 5, remote: false };
     expect((await save({ baseRevisionId: 1, upsert: { linkTypes: [type] } })).statusCode).toBe(201);
     expect((await getMap()).linkTypes.map((t) => t.name)).toContain('18GHz');
   });

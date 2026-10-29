@@ -106,6 +106,7 @@ button:disabled {
 
 .main {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   position: relative;
   overflow: hidden;
@@ -136,18 +137,23 @@ button:disabled {
   color: var(--accent);
 }
 
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 .sidebar {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
   width: 440px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 12px;
   overflow-y: auto;
   overflow-x: hidden;
-  pointer-events: none;
+  border-right: 1px solid var(--border);
+  background: #f6f8fa;
 }
 
 .sidebar > * {
@@ -313,21 +319,18 @@ button.danger {
   white-space: pre-wrap;
 }
 
-.toolbar {
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--border);
+.edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   background: #fff8e5;
+  border-color: #e3c56b;
 }
 
 .toolbar-row {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.toolbar-row.hint {
-  margin-top: 4px;
-  font-size: 12px;
 }
 
 .segmented {
@@ -347,7 +350,7 @@ button.danger {
   border-radius: 0 6px 6px 0;
 }
 
-.toolbar select,
+.edit-panel select,
 .message-input {
   font: inherit;
   padding: 4px 6px;
@@ -356,7 +359,7 @@ button.danger {
 }
 
 .message-input {
-  width: 280px;
+  width: 100%;
 }
 
 .banner {
@@ -376,6 +379,24 @@ button.danger {
 .map-canvas.editing [data-kind='label'],
 .map-canvas.editing [data-kind='linkLabel'] {
   cursor: move;
+}
+
+.map-canvas.editing [data-kind='linkPoint'] {
+  cursor: grab;
+}
+
+.map-canvas.editing [data-kind='linkPointNew'] {
+  cursor: copy;
+}
+
+.map-canvas.editing .resize-nw,
+.map-canvas.editing .resize-se {
+  cursor: nwse-resize;
+}
+
+.map-canvas.editing .resize-ne,
+.map-canvas.editing .resize-sw {
+  cursor: nesw-resize;
 }
 
 .map-canvas.tool-add,
@@ -448,10 +469,29 @@ button.danger {
 }
 
 .type-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid #eaeef2;
+}
+
+.type-row {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 0;
+}
+
+.type-row.secondary {
+  gap: 12px;
+  margin-top: 4px;
+  padding-left: 40px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.type-row.secondary label {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .type-list .grow {
@@ -459,11 +499,7 @@ button.danger {
 }
 
 .type-list .narrow {
-  width: 48px;
-}
-
-.type-list select {
-  width: 108px;
+  width: 52px;
 }
 
 .type-list button {
@@ -512,4 +548,17 @@ button.danger {
   background: #1f883d;
   color: #fff;
   font-size: 11px;
+}
+
+.chip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.field.hint {
+  justify-content: flex-end;
 }

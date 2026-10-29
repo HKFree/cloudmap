@@ -121,25 +121,25 @@ const initial: Migration = {
   },
 };
 
-const linkTechnology: Migration = {
+/** Added before the first release with an editor; v0.1.0 databases get the defaults. */
+const editorColumns: Migration = {
   async up(db: Kysely<any>) {
+    for (const table of ['link_type', 'link_type_history']) {
+      await db.schema.alterTable(table).addColumn('remote', 'integer', (c) => c.notNull().defaultTo(0)).execute();
+    }
     for (const table of ['link', 'link_history']) {
-      await db.schema
-        .alterTable(table)
-        .addColumn('technology', 'varchar(255)', (c) => c.notNull().defaultTo(''))
-        .execute();
+      await db.schema.alterTable(table).addColumn('corner_radius', 'double precision', (c) => c.notNull().defaultTo(0)).execute();
     }
   },
   async down(db: Kysely<any>) {
-    for (const table of ['link', 'link_history']) {
-      await db.schema.alterTable(table).dropColumn('technology').execute();
-    }
+    for (const table of ['link_type', 'link_type_history']) await db.schema.alterTable(table).dropColumn('remote').execute();
+    for (const table of ['link', 'link_history']) await db.schema.alterTable(table).dropColumn('corner_radius').execute();
   },
 };
 
 const migrations: Record<string, Migration> = {
   '0001_initial': initial,
-  '0002_link_technology': linkTechnology,
+  '0002_editor_columns': editorColumns,
 };
 
 export async function migrateToLatest(db: Kysely<any>): Promise<void> {

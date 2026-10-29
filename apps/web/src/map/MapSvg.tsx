@@ -1,7 +1,7 @@
 import { memo, type ReactNode } from 'react';
 import type { LinkType, MapData, MapLabel, MapLink, MapNode, NodeType } from '@cloudmap/shared';
-import type { ItemRef } from '../editor/operations';
-import { cloudPath, linkLabelPosition, linkPath, type Bounds } from './geometry';
+import { areaMembers, type ItemRef } from '../editor/operations';
+import { cloudPath, linkLabelPosition, linkPath, stubEnds, type Bounds } from './geometry';
 import { MultilineText } from './MultilineText';
 
 export interface MapHighlight {
@@ -22,9 +22,7 @@ interface Props {
 const DIMMED = 0.2;
 const SELECTION_COLOR = '#ffd400';
 
-export function linkCaption(link: MapLink): string {
-  return [link.capacity, link.technology && `(${link.technology})`].filter(Boolean).join('\n');
-}
+const oneLine = (text: string) => text.replace(/\n/g, ' ');
 
 /**
  * Pure rendering of the map in map coordinates. Used both on screen
@@ -38,7 +36,7 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
   const selection = highlight.selection ?? null;
 
   // Dimming helps to read a selection in view mode but gets in the way while editing.
-  const focus = editing ? undefined : focusSet(visibleLinks, selection);
+  const focus = editing ? undefined : focusSet(data, visibleLinks, selection);
   const nodeOpacity = (id: string) => (focus && !focus.nodes.has(id) ? DIMMED : 1);
   const linkOpacity = (id: string) => (focus && !focus.links.has(id) ? DIMMED : 1);
   const isSelected = (kind: ItemRef['kind'], id: string) =>
@@ -67,6 +65,20 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
           const to = nodes.get(l.toNodeId);
           const type = linkTypes.get(l.typeId);
           if (!from || !to || !type) return null;
+          if (type.remote) {
+            return (
+              <RemoteLink
+                key={l.id}
+                link={l}
+                from={from}
+                to={to}
+                type={type}
+                opacity={linkOpacity(l.id)}
+                selected={isSelected('link', l.id)}
+                interactive={interactive}
+              />
+            );
+          }
           return (
             <LinkLine
               key={l.id}
@@ -85,8 +97,8 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
         {visibleLinks.map((l) => {
           const from = nodes.get(l.fromNodeId);
           const to = nodes.get(l.toNodeId);
-          const caption = linkCaption(l);
-          if (!caption || !from || !to) return null;
+          const caption = l.capacity;
+          if (!caption || !from || !to || linkTypes.get(l.typeId)?.remote) return null;
           const at = linkLabelPosition(l, from, to);
           return (
             <g key={l.id} {...(interactive ? { 'data-kind': 'linkLabel', 'data-id': l.id } : {})}>
@@ -112,12 +124,16 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
   );
 }
 
-function focusSet(links: MapLink[], selection: ItemRef | null) {
+/** Items that stay fully visible around a selection; an area keeps everything inside it. */
+function focusSet(data: MapData, links: MapLink[], selection: ItemRef | null) {
   if (selection?.kind === 'node') {
-    const nodes = new Set([selection.id]);
+    const node = data.nodes.find((n) => n.id === selection.id);
+    const isArea = data.nodeTypes.some((t) => t.id === node?.typeId && t.isArea);
+    const centre = new Set([selection.id, ...(node && isArea ? areaMembers(data, node) : [])]);
+    const nodes = new Set(centre);
     const linkIds = new Set<string>();
     for (const l of links) {
-      if (l.fromNodeId === selection.id || l.toNodeId === selection.id) {
+      if (centre.has(l.fromNodeId) || centre.has(l.toNodeId)) {
         linkIds.add(l.id);
         nodes.add(l.fromNodeId);
         nodes.add(l.toNodeId);
@@ -233,6 +249,77 @@ const LinkLine = memo(function LinkLine({
     </g>
   );
 });
+
+const STUB_CAPTION_SIZE = 13;
+
+/** Leased line drawn as two stubs, each captioned with the site at the other end. */
+const RemoteLink = memo(function RemoteLink({
+  link,
+  from,
+  to,
+  type,
+  opacity,
+  selected,
+  interactive,
+}: {
+  link: MapLink;
+  from: MapNode;
+  to: MapNode;
+  type: LinkType;
+  opacity: number;
+  selected: boolean;
+  interactive: boolean;
+}) {
+  const ends = stubEnds(link, from, to);
+  const stubs = [
+    { start: from, end: ends[0], other: to },
+    { start: to, end: ends[1], other: from },
+  ];
+  return (
+    <g opacity={opacity}>
+      {stubs.map(({ start, end, other }, i) => {
+        const d = `M${start.x} ${start.y}L${end.x} ${end.y}`;
+        const caption = [`↔ ${oneLine(other.label) || '?'}`, link.capacity].filter(Boolean).join('\n');
+        const at = stubCaptionPlacement(start, end, caption.split('\n').length);
+        return (
+          <g key={i}>
+            {selected && <path d={d} fill="none" stroke={SELECTION_COLOR} strokeWidth={type.width + 10} strokeLinecap="round" />}
+            <path d={d} fill="none" stroke={type.color} strokeWidth={type.width} strokeDasharray={type.dash || undefined} />
+            <circle cx={end.x} cy={end.y} r={Math.max(type.width, 4)} fill="#ffffff" stroke={type.color} strokeWidth={2} />
+            {interactive && (
+              <path data-kind="link" data-id={link.id} d={d} fill="none" stroke="transparent" strokeWidth={Math.max(type.width, 14)} />
+            )}
+            <g {...(interactive ? { 'data-kind': 'link', 'data-id': link.id } : {})}>
+              <MultilineText
+                x={at.x}
+                y={at.y}
+                align={at.align}
+                text={caption}
+                fontSize={STUB_CAPTION_SIZE}
+                fill="#444444"
+                halo={selected ? SELECTION_COLOR : '#ffffff'}
+                interactive={interactive}
+              />
+            </g>
+          </g>
+        );
+      })}
+    </g>
+  );
+});
+
+/** Caption just beyond the stub end, aligned so it extends away from the node. */
+function stubCaptionPlacement(start: MapNode, end: { x: number; y: number }, lines: number) {
+  const length = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+  const ux = (end.x - start.x) / length;
+  const uy = (end.y - start.y) / length;
+  const gap = 12;
+  if (Math.abs(ux) > 0.4) {
+    return { x: end.x + ux * gap, y: end.y + uy * gap, align: ux > 0 ? ('left' as const) : ('right' as const) };
+  }
+  const blockOffset = (lines * STUB_CAPTION_SIZE * 1.15) / 2;
+  return { x: end.x, y: end.y + Math.sign(uy || 1) * (gap + blockOffset), align: 'center' as const };
+}
 
 const FreeLabel = memo(function FreeLabel({ label, selected, interactive }: { label: MapLabel; selected: boolean; interactive: boolean }) {
   return (

@@ -70,6 +70,7 @@ const toLinkType = (r: Row<'link_type'>): LinkType => ({
   dash: r.dash,
   description: r.description,
   sortOrder: r.sort_order,
+  remote: Boolean(r.remote),
 });
 
 const toNodeType = (r: Row<'node_type'>): NodeType => ({
@@ -105,8 +106,8 @@ const toLink = (r: Row<'link'>, points: Row<'link_point'>[]): MapLink => ({
   shape: r.shape as LinkShape,
   curvature: r.curvature,
   points: points.sort((a, b) => a.seq - b.seq).map(({ x, y }) => ({ x, y })),
+  cornerRadius: r.corner_radius,
   capacity: r.capacity,
-  technology: r.technology,
   labelX: r.label_x,
   labelY: r.label_y,
   note: r.note,
@@ -131,6 +132,7 @@ export const linkTypeRow = (t: LinkType): NewRow<'link_type'> => ({
   dash: t.dash,
   description: t.description,
   sort_order: t.sortOrder,
+  remote: t.remote ? 1 : 0,
 });
 
 export const nodeTypeRow = (t: NodeType): NewRow<'node_type'> => ({
@@ -165,8 +167,8 @@ export const linkRow = (l: MapLink): NewRow<'link'> => ({
   to_node_id: l.toNodeId,
   shape: l.shape,
   curvature: l.curvature,
+  corner_radius: l.cornerRadius,
   capacity: l.capacity,
-  technology: l.technology,
   label_x: l.labelX,
   label_y: l.labelY,
   note: l.note,

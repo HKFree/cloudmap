@@ -60,7 +60,18 @@ export function Legend({ linkTypes, nodeTypes, x = 0, y = 0, showTitle = true, s
             style={onToggleLinkType ? { cursor: 'pointer' } : undefined}
           >
             {onToggleLinkType && <rect x={0} y={cy - ROW / 2} width={LEGEND_WIDTH} height={ROW} fill="transparent" />}
-            <line x1={0} y1={cy} x2={SAMPLE_WIDTH} y2={cy} stroke={t.color} strokeWidth={t.width} strokeDasharray={t.dash || undefined} />
+            {t.remote ? (
+              <g stroke={t.color} strokeWidth={t.width} strokeDasharray={t.dash || undefined}>
+                <line x1={0} y1={cy} x2={SAMPLE_WIDTH * 0.3} y2={cy} />
+                <line x1={SAMPLE_WIDTH * 0.7} y1={cy} x2={SAMPLE_WIDTH} y2={cy} />
+                <g fill="#ffffff" strokeWidth={2} strokeDasharray="none">
+                  <circle cx={SAMPLE_WIDTH * 0.3} cy={cy} r={3} />
+                  <circle cx={SAMPLE_WIDTH * 0.7} cy={cy} r={3} />
+                </g>
+              </g>
+            ) : (
+              <line x1={0} y1={cy} x2={SAMPLE_WIDTH} y2={cy} stroke={t.color} strokeWidth={t.width} strokeDasharray={t.dash || undefined} />
+            )}
             <text x={TEXT_X} y={cy} dominantBaseline="central">
               {t.name}
             </text>

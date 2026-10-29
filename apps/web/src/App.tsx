@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { MapData, Point } from '@cloudmap/shared';
+import { assignReadableIds, diffMaps, type MapData, type Point } from '@cloudmap/shared';
 import { fetchMap, restoreRevision, saveChanges } from './api';
 import { DetailPanel } from './components/DetailPanel';
 import { Footer } from './components/Footer';
@@ -7,7 +7,7 @@ import { HistoryPanel } from './components/HistoryPanel';
 import { SearchBox } from './components/SearchBox';
 import { EditToolbar, type Tool } from './editor/EditToolbar';
 import { LinkTypesPanel } from './editor/LinkTypesPanel';
-import { createLabel, createLink, createNode, deleteItem, moveItem, upsertItem, type ItemRef } from './editor/operations';
+import { createLabel, createLink, createNode, deleteItem, moveItem, removeLinkPoint, upsertItem, type ItemRef } from './editor/operations';
 import { useEditor } from './editor/useEditor';
 import { useHashState } from './hash';
 import type { Bounds } from './map/geometry';
@@ -29,13 +29,14 @@ function itemBounds(map: MapData, item: ItemRef): Bounds | null {
   const link = map.links.find((l) => l.id === item.id);
   const from = map.nodes.find((n) => n.id === link?.fromNodeId);
   const to = map.nodes.find((n) => n.id === link?.toNodeId);
-  if (!from || !to) return null;
+  if (!link || !from || !to) return null;
+  const points = [from, to, ...link.points];
   const padding = 150;
   return {
-    minX: Math.min(from.x, to.x) - padding,
-    minY: Math.min(from.y, to.y) - padding,
-    maxX: Math.max(from.x, to.x) + padding,
-    maxY: Math.max(from.y, to.y) + padding,
+    minX: Math.min(...points.map((p) => p.x)) - padding,
+    minY: Math.min(...points.map((p) => p.y)) - padding,
+    maxX: Math.max(...points.map((p) => p.x)) + padding,
+    maxY: Math.max(...points.map((p) => p.y)) + padding,
   };
 }
 
@@ -45,6 +46,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [hiddenLinkTypes, setHiddenLinkTypes] = useState<ReadonlySet<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
   const mapRef = useRef<MapViewHandle>(null);
 
   const editor = useEditor();
@@ -111,6 +113,7 @@ export function App() {
     if (revision) navigate({ selection, revision: null });
     setNewLinkTypeId((id) => id || current.linkTypes[0]?.id || '');
     setSaveError(null);
+    setShowSidebar(true);
     editor.start(current);
   };
 
@@ -126,13 +129,17 @@ export function App() {
   };
 
   const save = async () => {
-    if (!editor.changes || !editor.base) return;
+    if (!editor.draft || !editor.base) return;
     setSaving(true);
     setSaveError(null);
     try {
-      await saveChanges({ baseRevisionId: editor.base.revision?.id ?? null, message, ...editor.changes });
+      // New items get their final, readable ids from their names only now.
+      const { map: draft, renamed } = assignReadableIds(editor.draft);
+      await saveChanges({ baseRevisionId: editor.base.revision?.id ?? null, message, ...diffMaps(editor.base, draft) });
       editor.start(await reload());
       setMessage('');
+      const renamedSelection = selection && renamed.get(selection.id);
+      if (renamedSelection) navigate({ selection: { ...selection, id: renamedSelection }, revision }, { replace: true });
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Uložení selhalo');
     } finally {
@@ -224,6 +231,14 @@ export function App() {
   return (
     <div className="layout">
       <header className="header">
+        <button
+          type="button"
+          className={showSidebar ? 'active' : undefined}
+          onClick={() => setShowSidebar((v) => !v)}
+          title={showSidebar ? 'Skrýt panel' : 'Zobrazit panel'}
+        >
+          ☰
+        </button>
         <h1>
           hkfree <span>cloudmap</span>
         </h1>
@@ -232,7 +247,10 @@ export function App() {
           Celá mapa
         </button>
         <span className="spacer" />
-        <button type="button" className={showHistory ? 'active' : undefined} onClick={() => setShowHistory((v) => !v)}>
+        <button type="button" className={showHistory ? 'active' : undefined} onClick={() => {
+            setShowHistory((v) => !v);
+            setShowSidebar(true);
+          }}>
           Historie
         </button>
         {!editing && (
@@ -241,26 +259,6 @@ export function App() {
           </button>
         )}
       </header>
-
-      {editing && shown && (
-        <EditToolbar
-          data={shown}
-          editor={editor}
-          tool={tool}
-          onToolChange={changeTool}
-          newNodeTypeId={newNodeTypeId}
-          onNewNodeTypeChange={setNewNodeTypeId}
-          newLinkTypeId={newLinkTypeId}
-          onNewLinkTypeChange={setNewLinkTypeId}
-          message={message}
-          onMessageChange={setMessage}
-          saving={saving}
-          error={saveError}
-          onSave={save}
-          onDiscard={discardChanges}
-          onFinish={finishEditing}
-        />
-      )}
 
       {!editing && revision && (
         <div className="banner">
@@ -282,30 +280,28 @@ export function App() {
         </div>
       )}
 
-      <main className="main">
-        {error && <div className="message error">{error}</div>}
-        {!shown && !error && <div className="message">Načítám mapu…</div>}
-        {shown && shown.nodes.length === 0 && !editing && (
-          <div className="message">Mapa je prázdná. Naimportujte data z Dia diagramu, nebo ji začněte kreslit.</div>
-        )}
-        {shown && (
-          <MapView
-            ref={mapRef}
-            data={shown}
-            highlight={{ selection, pendingNodeId: pendingFrom, hiddenLinkTypeIds: hiddenLinkTypes }}
-            editing={editing}
-            canDrag={tool === 'select'}
-            cursorClass={tool !== 'select' ? 'tool-add' : undefined}
-            onItemClick={onItemClick}
-            onBackgroundClick={onBackgroundClick}
-            onDragStart={editor.beginDrag}
-            onDragMove={(item, dx, dy) => editor.dragTo((m) => moveItem(m, item, dx, dy))}
-            onDragEnd={editor.endDrag}
-          />
-        )}
-
-        {shown && (
+      <div className="workspace">
+        {shown && showSidebar && (
           <aside className="sidebar">
+            {editing && (
+              <EditToolbar
+                data={shown}
+                editor={editor}
+                tool={tool}
+                onToolChange={changeTool}
+                newNodeTypeId={newNodeTypeId}
+                onNewNodeTypeChange={setNewNodeTypeId}
+                newLinkTypeId={newLinkTypeId}
+                onNewLinkTypeChange={setNewLinkTypeId}
+                message={message}
+                onMessageChange={setMessage}
+                saving={saving}
+                error={saveError}
+                onSave={save}
+                onDiscard={discardChanges}
+                onFinish={finishEditing}
+              />
+            )}
             {showHistory && (
               <HistoryPanel
                 viewedRevision={revision}
@@ -343,7 +339,30 @@ export function App() {
             </details>
           </aside>
         )}
-      </main>
+        <main className="main">
+          {error && <div className="message error">{error}</div>}
+          {!shown && !error && <div className="message">Načítám mapu…</div>}
+          {shown && shown.nodes.length === 0 && !editing && (
+            <div className="message">Mapa je prázdná. Naimportujte data z Dia diagramu, nebo ji začněte kreslit.</div>
+          )}
+          {shown && (
+            <MapView
+              ref={mapRef}
+              data={shown}
+              highlight={{ selection, pendingNodeId: pendingFrom, hiddenLinkTypeIds: hiddenLinkTypes }}
+              editing={editing}
+              canDrag={tool === 'select'}
+              cursorClass={tool !== 'select' ? 'tool-add' : undefined}
+              onItemClick={onItemClick}
+              onBackgroundClick={onBackgroundClick}
+              onDragStart={editor.beginDrag}
+              onDragMove={(item, dx, dy) => editor.dragTo((m) => moveItem(m, item, dx, dy))}
+              onDragEnd={editor.endDrag}
+              onPointRemove={(id) => editor.apply((m) => removeLinkPoint(m, id))}
+            />
+          )}
+        </main>
+      </div>
 
       <Footer data={shown} />
     </div>

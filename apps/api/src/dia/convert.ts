@@ -1,4 +1,4 @@
-import type { LinkType, MapLabel, MapLink, MapNode, NodeType, Point } from '@cloudmap/shared';
+import { assignReadableIds, temporaryId, type LinkType, type MapLabel, type MapLink, type MapNode, type NodeType, type Point } from '@cloudmap/shared';
 import {
   attrBool,
   attrColor,
@@ -20,6 +20,8 @@ const MARGIN_PX = 40;
 const LINK_LABEL_DISTANCE_CM = 2.5;
 const LINK_LABEL_PATTERN = /\d\s*(m|g)b|mbit|gbit|mbps|gbps|ghz|mimo/i;
 const LINK_LABEL_MAX_LINES = 3;
+/** Legend rows of leased connectivity outside hkfree, drawn as stubs at both ends. */
+const REMOTE_LINK_TYPE = /konektivita/i;
 
 /** Styles used in the diagram but missing from its legend, inserted after the given legend row. */
 const EXTRA_LINK_TYPES: Record<string, { name: string; after: string }> = {
@@ -35,7 +37,7 @@ const TEXT = 'Standard - Text';
 export const NODE_TYPES = {
   ap24: { id: 'ap24', name: 'AP 2,4 GHz', shape: 'cloud', fillColor: '#d4f3ff', strokeColor: '#000000', isArea: false },
   ap5: { id: 'ap5', name: 'AP 5 GHz', shape: 'cloud', fillColor: '#75ff75', strokeColor: '#000000', isArea: false },
-  lan: { id: 'lan', name: 'LAN', shape: 'cloud', fillColor: '#ffffff', strokeColor: '#000000', isArea: true },
+  area: { id: 'oblast', name: 'Oblast', shape: 'cloud', fillColor: '#ffffff', strokeColor: '#000000', isArea: true },
   nodeAp: { id: 'uzel-ap', name: 'Uzel s AP', shape: 'ellipse', fillColor: '#75ff75', strokeColor: '#000000', isArea: false },
   nodeOther: { id: 'uzel', name: 'Uzel (retranslace, klient…)', shape: 'ellipse', fillColor: '#ffffff', strokeColor: '#000000', isArea: false },
   point: { id: 'bod', name: 'Bod', shape: 'point', fillColor: null, strokeColor: '#000000', isArea: false },
@@ -52,6 +54,7 @@ export interface ImportedMap {
 export interface ImportReport {
   warnings: string[];
   linkLabelsMatched: number;
+  remoteLinksJoined: number;
   freeLabels: number;
 }
 
@@ -76,7 +79,8 @@ interface PendingLink {
   path: Point[];
 }
 
-export function convertDia(objects: DiaObject[], newId: () => string): { map: ImportedMap; report: ImportReport } {
+/** Converts Dia objects to map items with readable ids derived from their names. */
+export function convertDia(objects: DiaObject[]): { map: ImportedMap; report: ImportReport } {
   const warnings: string[] = [];
   const origin = diagramOrigin(objects);
   const px = (p: Point): Point => ({
@@ -93,7 +97,7 @@ export function convertDia(objects: DiaObject[], newId: () => string): { map: Im
   });
 
   const legendLineIds = new Set<string>();
-  const linkTypes = legendLinkTypes(objects, texts, legendLineIds, newId);
+  const linkTypes = legendLinkTypes(objects, texts, legendLineIds);
   const legendSampleIds = legendNodeSamples(objects, texts);
 
   const nodeTypes: NodeType[] = Object.values(NODE_TYPES).map((t, i) => ({ ...t, description: '', sortOrder: i }));
@@ -112,7 +116,7 @@ export function convertDia(objects: DiaObject[], newId: () => string): { map: Im
     const center = { x: corner.x + width / 2, y: corner.y + height / 2 };
     const bounds = { x1: corner.x, y1: corner.y, x2: corner.x + width, y2: corner.y + height };
     const label = nodeLabel(obj, center, bounds, texts);
-    const id = newId();
+    const id = temporaryId();
     nodeIdByDiaId.set(obj.id, id);
     nodes.push({
       id,
@@ -128,16 +132,16 @@ export function convertDia(objects: DiaObject[], newId: () => string): { map: Im
     });
   }
   for (const node of nodes) {
-    if (!node.label && node.typeId !== NODE_TYPES.lan.id) warnings.push(`Uzel bez popisku na pozici ${node.x},${node.y}`);
+    if (!node.label && node.typeId !== NODE_TYPES.area.id) warnings.push(`Uzel bez popisku na pozici ${node.x},${node.y}`);
   }
 
   const pointNode = (p: Point): string => {
-    const id = newId();
+    const id = temporaryId();
     nodes.push({ id, typeId: NODE_TYPES.point.id, label: '', ...px(p), width: 0, height: 0, fontSize: 16, labelDx: 0, labelDy: 0, note: '' });
     return id;
   };
 
-  const linkTypeMatcher = createLinkTypeMatcher(linkTypes, newId, warnings);
+  const linkTypeMatcher = createLinkTypeMatcher(linkTypes, warnings);
   const pending: PendingLink[] = [];
   let arrows = 0;
 
@@ -159,15 +163,15 @@ export function convertDia(objects: DiaObject[], newId: () => string): { map: Im
 
     pending.push({
       link: {
-        id: newId(),
+        id: temporaryId(),
         typeId: linkTypeMatcher.match(lineStyle(obj)),
         fromNodeId,
         toNodeId,
         shape: geometry.shape,
         curvature: geometry.curvature,
         points: geometry.controlPoints.map(px),
+        cornerRadius: 0,
         capacity: '',
-        technology: '',
         labelX: null,
         labelY: null,
         note: '',
@@ -183,22 +187,86 @@ export function convertDia(objects: DiaObject[], newId: () => string): { map: Im
   for (const box of texts) {
     if (box.used) continue;
     const target = isLinkLabel(box.text.string) ? nearestLink(box.center, pending) : undefined;
-    if (target && !target.link.capacity && !target.link.technology) {
+    if (target && !target.link.capacity && !target.link.note) {
       const p = px(box.center);
-      Object.assign(target.link, splitLinkLabel(box.text.string));
+      const { capacity, rest } = splitLinkLabel(box.text.string);
+      const typeName = linkTypes.find((t) => t.id === target.link.typeId)?.name ?? '';
+      target.link.capacity = capacity;
+      // The band is already given by the link type; anything else (e.g. provider) goes to the note.
+      if (rest && !compact(typeName).includes(compact(rest))) target.link.note = rest;
       target.link.labelX = p.x;
       target.link.labelY = p.y;
       linkLabelsMatched++;
       continue;
     }
-    labels.push(freeLabel(box, px, newId()));
+    labels.push(freeLabel(box, px, temporaryId()));
+  }
+
+  const remote = joinRemoteStubs(pending.map((p) => p.link), nodes, linkTypes);
+  const { map } = assignReadableIds({ linkTypes, nodeTypes, nodes: remote.nodes, links: remote.links, labels });
+  return {
+    map,
+    report: { warnings, linkLabelsMatched, remoteLinksJoined: remote.joined, freeLabels: labels.length },
+  };
+}
+
+/**
+ * The diagram draws a leased line as two loose stubs, one at each site, where one
+ * stub caption names the other site (e.g. "1x 1000 Mbit/s PMV" at Natura).
+ * Such pairs become one link whose points are the outer ends of the stubs.
+ */
+function joinRemoteStubs(links: MapLink[], nodes: MapNode[], linkTypes: LinkType[]) {
+  const remoteTypes = new Set(linkTypes.filter((t) => t.remote).map((t) => t.id));
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const isPoint = (id: string) => nodeById.get(id)?.typeId === NODE_TYPES.point.id;
+  const linkCount = new Map<string, number>();
+  for (const l of links) for (const id of [l.fromNodeId, l.toNodeId]) linkCount.set(id, (linkCount.get(id) ?? 0) + 1);
+
+  const stubs: { link: MapLink; site: MapNode; end: MapNode }[] = [];
+  for (const link of links) {
+    if (!remoteTypes.has(link.typeId)) continue;
+    const ends = [link.fromNodeId, link.toNodeId];
+    const looseEnd = ends.find((id) => isPoint(id) && linkCount.get(id) === 1);
+    const siteId = ends.find((id) => !isPoint(id));
+    if (looseEnd && siteId) stubs.push({ link, site: nodeById.get(siteId)!, end: nodeById.get(looseEnd)! });
+  }
+
+  const removedLinks = new Set<string>();
+  const removedNodes = new Set<string>();
+  const available = (s: (typeof stubs)[number]) => !removedLinks.has(s.link.id) && !removedNodes.has(s.end.id);
+  for (const stub of stubs) {
+    if (!available(stub)) continue;
+    for (const word of stub.link.capacity.split(/\s+/).filter((w) => /^\p{L}{3,}$/u.test(w))) {
+      const sameName = (label: string) => label.split(/\s+/).some((w) => w.toLowerCase() === word.toLowerCase());
+      const candidates = stubs.filter((s) => s !== stub && available(s) && sameName(s.site.label));
+      if (candidates.length !== 1) continue;
+      const other = candidates[0]!;
+      Object.assign(stub.link, {
+        fromNodeId: stub.site.id,
+        toNodeId: other.site.id,
+        shape: 'straight',
+        points: [
+          { x: stub.end.x, y: stub.end.y },
+          { x: other.end.x, y: other.end.y },
+        ],
+        capacity: stub.link.capacity.split(/\s+/).filter((w) => w !== word).join(' '),
+        labelX: null,
+        labelY: null,
+      });
+      removedLinks.add(other.link.id);
+      removedNodes.add(stub.end.id).add(other.end.id);
+      break;
+    }
   }
 
   return {
-    map: { linkTypes, nodeTypes, nodes, links: pending.map((p) => p.link), labels },
-    report: { warnings, linkLabelsMatched, freeLabels: labels.length },
+    links: links.filter((l) => !removedLinks.has(l.id)),
+    nodes: nodes.filter((n) => !removedNodes.has(n.id)),
+    joined: removedLinks.size,
   };
 }
+
+const compact = (text: string) => text.toLowerCase().replace(/\s+/g, '');
 
 function diagramOrigin(objects: DiaObject[]): Point {
   let x = Infinity;
@@ -213,7 +281,7 @@ function diagramOrigin(objects: DiaObject[]): Point {
 }
 
 /** Legend rows are unconnected horizontal lines with their name written just to the right. */
-function legendLinkTypes(objects: DiaObject[], texts: TextBox[], legendLineIds: Set<string>, newId: () => string): LinkType[] {
+function legendLinkTypes(objects: DiaObject[], texts: TextBox[], legendLineIds: Set<string>): LinkType[] {
   const rows: { obj: DiaObject; text: TextBox }[] = [];
   for (const obj of objects) {
     if (obj.type !== 'Standard - Line' || obj.connections.length > 0) continue;
@@ -236,13 +304,14 @@ function legendLinkTypes(objects: DiaObject[], texts: TextBox[], legendLineIds: 
     .map(({ obj, text }, i) => {
       const style = lineStyle(obj);
       return {
-        id: newId(),
+        id: temporaryId(),
         name: normalizeLines(text.text.string).join(' '),
         color: style.color,
         width: round(style.width * PX_PER_CM),
         dash: dashPattern(style),
         description: '',
         sortOrder: i,
+        remote: REMOTE_LINK_TYPE.test(text.text.string),
       };
     });
 }
@@ -263,10 +332,10 @@ function legendNodeSamples(objects: DiaObject[], texts: TextBox[]): Set<string> 
 
 function nodeTypeFor(obj: DiaObject): string | undefined {
   if (obj.type === CLOUD) {
-    if (attrBool(obj, 'show_background') === false) return NODE_TYPES.lan.id;
+    if (attrBool(obj, 'show_background') === false) return NODE_TYPES.area.id;
     const fill = attrColor(obj, 'fill_colour')?.toLowerCase();
     if (fill === NODE_TYPES.ap24.fillColor) return NODE_TYPES.ap24.id;
-    if (fill === '#ffffff') return NODE_TYPES.lan.id;
+    if (fill === '#ffffff') return NODE_TYPES.area.id;
     return NODE_TYPES.ap5.id;
   }
   if (obj.type === FLOWCHART_ELLIPSE || obj.type === STANDARD_ELLIPSE) {
@@ -349,7 +418,7 @@ function dashPattern({ style, dashLength }: LineStyle): string {
  * from the most common width of its links, because the legend samples are drawn
  * thinner than the real links.
  */
-function createLinkTypeMatcher(linkTypes: LinkType[], newId: () => string, warnings: string[]) {
+function createLinkTypeMatcher(linkTypes: LinkType[], warnings: string[]) {
   const widths = new Map<string, number[]>();
 
   const match = (style: LineStyle): string => {
@@ -367,13 +436,14 @@ function createLinkTypeMatcher(linkTypes: LinkType[], newId: () => string, warni
     if (!type) {
       const extra = EXTRA_LINK_TYPES[style.color];
       type = {
-        id: newId(),
+        id: temporaryId(),
         name: extra?.name ?? `Neznámý typ ${style.color}`,
         color: style.color,
         width: round(style.width * PX_PER_CM),
         dash: dashPattern(style),
         description: '',
         sortOrder: 0,
+        remote: false,
       };
       const afterIndex = extra ? linkTypes.findIndex((t) => t.name === extra.after) : -1;
       linkTypes.splice(afterIndex >= 0 ? afterIndex + 1 : linkTypes.length, 0, type);

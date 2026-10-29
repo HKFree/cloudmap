@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { linkShapes, type LinkShape, type MapData, type MapLabel, type MapLink, type MapNode } from '@cloudmap/shared';
-import { patchItem, type ItemRef } from '../editor/operations';
+import { areaMembers, changeLinkShape, DEFAULT_CORNER_RADIUS, isArea, patchItem, type ItemRef } from '../editor/operations';
+import { textBlockWidth } from '../map/MultilineText';
 import type { Editor } from '../editor/useEditor';
 
 interface Props {
@@ -14,6 +15,8 @@ interface Props {
 }
 
 const oneLine = (text: string) => text.replace(/\n/g, ' ');
+
+const alignOffset: Record<MapLabel['align'], number> = { left: 0, center: 0.5, right: 1 };
 
 const shapeNames: Record<LinkShape, string> = {
   straight: 'Rovná',
@@ -41,6 +44,7 @@ function NodeDetail({ data, node, editor, onSelect, onDelete, onClose }: Props &
   const linkTypes = new Map(data.linkTypes.map((t) => [t.id, t]));
   const type = data.nodeTypes.find((t) => t.id === node.typeId);
   const links = data.links.filter((l) => l.fromNodeId === node.id || l.toNodeId === node.id);
+  const members = isArea(data, node) ? data.nodes.filter((n) => areaMembers(data, node).has(n.id) && n.label) : [];
   const edit = (patch: Partial<MapNode>, field: string) =>
     editor?.apply((m) => patchItem(m, 'nodes', node.id, patch), `node:${node.id}:${field}`);
 
@@ -62,9 +66,8 @@ function NodeDetail({ data, node, editor, onSelect, onDelete, onClose }: Props &
             </select>
           </Field>
           <div className="field-row">
-            <NumberField label="Šířka" value={node.width} onChange={(width) => edit({ width }, 'width')} />
-            <NumberField label="Výška" value={node.height} onChange={(height) => edit({ height }, 'height')} />
-            <NumberField label="Písmo" value={node.fontSize} min={4} onChange={(fontSize) => edit({ fontSize }, 'font')} />
+            <NumberField label="Velikost písma" value={node.fontSize} min={4} onChange={(fontSize) => edit({ fontSize }, 'font')} />
+            <span className="field hint">Velikost uzlu změníte tažením rohů v mapě.</span>
           </div>
           <Field label="Poznámka">
             <textarea rows={3} value={node.note} onChange={(e) => edit({ note: e.target.value }, 'note')} />
@@ -77,6 +80,21 @@ function NodeDetail({ data, node, editor, onSelect, onDelete, onClose }: Props &
         <>
           <p className="muted">{type?.name}</p>
           {node.note && <p className="note">{node.note}</p>}
+        </>
+      )}
+
+      {members.length > 0 && (
+        <>
+          <h3>V oblasti ({members.length})</h3>
+          <ul className="chip-list">
+            {members.map((member) => (
+              <li key={member.id}>
+                <button type="button" onClick={() => onSelect({ kind: 'node', id: member.id }, true)}>
+                  {oneLine(member.label)}
+                </button>
+              </li>
+            ))}
+          </ul>
         </>
       )}
 
@@ -93,7 +111,7 @@ function NodeDetail({ data, node, editor, onSelect, onDelete, onClose }: Props &
                 {oneLine(nodes.get(otherId)?.label || '(bez názvu)')}
               </button>
               <button type="button" className="muted" onClick={() => onSelect({ kind: 'link', id: link.id }, true)}>
-                {[linkType?.name, link.capacity, link.technology].filter(Boolean).join(', ')}
+                {[linkType?.name, link.capacity].filter(Boolean).join(', ')}
               </button>
             </li>
           );
@@ -107,16 +125,12 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
   const nodes = new Map(data.nodes.map((n) => [n.id, n]));
   const linkType = data.linkTypes.find((t) => t.id === link.typeId);
   const nodeName = (id: string) => oneLine(nodes.get(id)?.label || '(bez názvu)');
-  const technologies = [...new Set(data.links.map((l) => l.technology).filter(Boolean))].sort();
   const edit = (patch: Partial<MapLink>, field: string) =>
     editor?.apply((m) => patchItem(m, 'links', link.id, patch), `link:${link.id}:${field}`);
-
-  const changeShape = (shape: LinkShape) => {
-    // Bend points belong to curves and polylines only; an arc starts with a gentle bulge.
-    const keepPoints = shape === link.shape;
-    edit({ shape, points: keepPoints ? link.points : [], curvature: shape === 'arc' ? link.curvature || 0.15 : 0 }, 'shape');
-  };
-  const availableShapes = linkShapes.filter((s) => s === 'straight' || s === 'arc' || s === link.shape);
+  const changeShape = (shape: LinkShape) => editor?.apply((m) => changeLinkShape(m, link.id, shape));
+  // Bezier curves come only from the import; new ones cannot be drawn yet.
+  const availableShapes = linkShapes.filter((s) => s !== 'bezier' || s === link.shape);
+  const remote = linkType?.remote ?? false;
 
   return (
     <section className="panel detail">
@@ -142,38 +156,46 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
               ))}
             </select>
           </Field>
-          <div className="field-row">
-            <Field label="Kapacita">
-              <input value={link.capacity} placeholder="např. 1Gbps" onChange={(e) => edit({ capacity: e.target.value }, 'capacity')} />
-            </Field>
-            <Field label="Technologie">
-              <input
-                value={link.technology}
-                list="technologies"
-                placeholder="např. 10GHz"
-                onChange={(e) => edit({ technology: e.target.value }, 'technology')}
-              />
-              <datalist id="technologies">
-                {technologies.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
-            </Field>
-          </div>
-          <div className="field-row">
-            <Field label="Tvar">
-              <select value={link.shape} onChange={(e) => changeShape(e.target.value as LinkShape)}>
-                {availableShapes.map((s) => (
-                  <option key={s} value={s}>
-                    {shapeNames[s]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {link.shape === 'arc' && (
-              <NumberField label="Prohnutí" value={link.curvature} step={0.05} onChange={(curvature) => edit({ curvature }, 'curvature')} />
-            )}
-          </div>
+          <Field label="Kapacita">
+            <input value={link.capacity} placeholder="např. 1Gbps" onChange={(e) => edit({ capacity: e.target.value }, 'capacity')} />
+          </Field>
+          {remote ? (
+            <p className="hint">
+              Vzdálený spoj se kreslí jen jako dva konce u svých uzlů. Konce lze v mapě přetáhnout, dvojklikem se vrátí na
+              výchozí místo.
+            </p>
+          ) : (
+            <>
+              <div className="field-row">
+                <Field label="Tvar">
+                  <select value={link.shape} onChange={(e) => changeShape(e.target.value as LinkShape)}>
+                    {availableShapes.map((s) => (
+                      <option key={s} value={s}>
+                        {shapeNames[s]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {link.shape === 'arc' && (
+                  <NumberField label="Prohnutí" value={link.curvature} step={0.05} onChange={(curvature) => edit({ curvature }, 'curvature')} />
+                )}
+                {link.shape === 'polyline' && (
+                  <Field label={`Zaoblení rohů (${link.cornerRadius} px)`}>
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(100, DEFAULT_CORNER_RADIUS * 5)}
+                      value={link.cornerRadius}
+                      onChange={(e) => edit({ cornerRadius: Number(e.target.value) }, 'corner-radius')}
+                    />
+                  </Field>
+                )}
+              </div>
+              {link.shape === 'polyline' && (
+                <p className="hint">Body lomu přesunete tažením, tažením „+“ přidáte nový bod, dvojklikem bod odeberete.</p>
+              )}
+            </>
+          )}
           <Field label="Poznámka">
             <textarea rows={3} value={link.note} onChange={(e) => edit({ note: e.target.value }, 'note')} />
           </Field>
@@ -194,8 +216,6 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
           </dd>
           <dt>Kapacita</dt>
           <dd>{link.capacity || '–'}</dd>
-          <dt>Technologie</dt>
-          <dd>{link.technology || '–'}</dd>
           {link.note && (
             <>
               <dt>Poznámka</dt>
@@ -212,6 +232,13 @@ function LabelDetail({ label, editor, onDelete, onClose }: Props & { label: MapL
   const edit = (patch: Partial<MapLabel>, field: string) =>
     editor?.apply((m) => patchItem(m, 'labels', label.id, patch), `label:${label.id}:${field}`);
 
+  // The anchor moves with the alignment, so the text block stays where it is and only its lines realign.
+  const changeAlign = (align: MapLabel['align']) => {
+    const width = textBlockWidth(label.text, label.fontSize, label.bold);
+    const left = label.x - alignOffset[label.align] * width;
+    edit({ align, x: Math.round((left + alignOffset[align] * width) * 10) / 10 }, 'align');
+  };
+
   return (
     <section className="panel detail">
       <PanelHeader title="Popisek" onClose={onClose} />
@@ -226,7 +253,7 @@ function LabelDetail({ label, editor, onDelete, onClose }: Props & { label: MapL
               <input type="color" value={label.color} onChange={(e) => edit({ color: e.target.value }, 'color')} />
             </Field>
             <Field label="Zarovnání">
-              <select value={label.align} onChange={(e) => edit({ align: e.target.value as MapLabel['align'] }, 'align')}>
+              <select value={label.align} onChange={(e) => changeAlign(e.target.value as MapLabel['align'])}>
                 <option value="left">Vlevo</option>
                 <option value="center">Na střed</option>
                 <option value="right">Vpravo</option>

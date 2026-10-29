@@ -1,8 +1,9 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, type MouseEvent, type PointerEvent } from 'react';
+import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { select } from 'd3-selection';
 import { zoom, zoomIdentity, type ZoomBehavior, type ZoomTransform } from 'd3-zoom';
 import type { MapData, Point } from '@cloudmap/shared';
-import type { DragRef, ItemRef } from '../editor/operations';
+import { itemOf, type DragRef, type ItemRef } from '../editor/operations';
+import { EditHandles } from './EditHandles';
 import { mapBounds, type Bounds } from './geometry';
 import { MapLayers, type MapHighlight } from './MapSvg';
 
@@ -11,8 +12,8 @@ export interface MapViewHandle {
   fit: () => void;
 }
 
-/** Hit target under the pointer; `linkLabel` is the caption of a link. */
-type Target = { kind: ItemRef['kind'] | 'linkLabel'; id: string };
+/** Hit target under the pointer: a map item, a link caption or an edit handle. */
+type Target = { kind: ItemRef['kind'] | DragRef['kind']; id: string };
 
 interface Props {
   data: MapData;
@@ -26,6 +27,8 @@ interface Props {
   onDragStart: (item: DragRef) => void;
   onDragMove: (item: DragRef, dx: number, dy: number) => void;
   onDragEnd: (item: DragRef) => void;
+  /** Double click on a polyline vertex or a stub end. */
+  onPointRemove: (pointId: string) => void;
 }
 
 const MIN_ZOOM = 0.05;
@@ -39,8 +42,10 @@ function targetOf(element: EventTarget | null): Target | null {
   return kind && id ? { kind: kind as Target['kind'], id } : null;
 }
 
-const asItem = ({ kind, id }: Target): ItemRef => ({ kind: kind === 'linkLabel' ? 'link' : kind, id });
 const isDraggable = (target: Target | null): target is DragRef => target !== null && target.kind !== 'link';
+
+/** The map itself re-renders only when data or highlight change, not on every zoom step. */
+const Layers = memo(MapLayers);
 
 export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, ref) {
   const { data, highlight, editing, canDrag, cursorClass } = props;
@@ -48,6 +53,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
   const layerRef = useRef<SVGGElement>(null);
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown>>(null);
   const transformRef = useRef<ZoomTransform>(zoomIdentity);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const boundsRef = useRef<Bounds>(mapBounds(data));
   boundsRef.current = mapBounds(data);
 
@@ -58,6 +64,8 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
   const initialFitDone = useRef(false);
   const drag = useRef<{ target: DragRef; start: Point; client: Point; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
+  /** Pointer capture retargets click events to the <svg>, so remember what was pressed. */
+  const pressedTarget = useRef<Target | null>(null);
 
   const toMap = (clientX: number, clientY: number): Point => {
     const rect = svgRef.current!.getBoundingClientRect();
@@ -91,6 +99,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
       .on('zoom', (event) => {
         transformRef.current = event.transform;
         layerRef.current?.setAttribute('transform', event.transform.toString());
+        setZoomLevel(event.transform.k);
       });
     zoomRef.current = behavior;
     select(svg).call(behavior).on('dblclick.zoom', null);
@@ -110,6 +119,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
     suppressClick.current = false;
     const target = targetOf(event.target);
+    pressedTarget.current = target;
     if (!editing || !canDrag || event.button !== 0 || !isDraggable(target)) return;
     drag.current = { target, start: toMap(event.clientX, event.clientY), client: { x: event.clientX, y: event.clientY }, moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -133,7 +143,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
     drag.current = null;
     suppressClick.current = true;
     props.onDragEnd(current.target);
-    if (!current.moved) props.onItemClick(asItem(current.target));
+    if (!current.moved) props.onItemClick(itemOf(current.target));
   };
 
   const onClick = (event: MouseEvent<SVGSVGElement>) => {
@@ -142,8 +152,13 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
       return;
     }
     const target = targetOf(event.target);
-    if (target) props.onItemClick(asItem(target));
+    if (target) props.onItemClick(itemOf(target));
     else props.onBackgroundClick(toMap(event.clientX, event.clientY));
+  };
+
+  const onDoubleClick = (event: MouseEvent<SVGSVGElement>) => {
+    const target = targetOf(event.target) ?? pressedTarget.current;
+    if (editing && target?.kind === 'linkPoint') props.onPointRemove(target.id);
   };
 
   return (
@@ -155,9 +170,11 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       <g ref={layerRef}>
-        <MapLayers data={data} highlight={highlight} interactive editing={editing} />
+        <Layers data={data} highlight={highlight} interactive editing={editing} />
+        {editing && <EditHandles data={data} selection={highlight.selection ?? null} zoom={zoomLevel} />}
       </g>
     </svg>
   );

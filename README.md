@@ -27,13 +27,25 @@ API dokumentace (OpenAPI): `/api/v1/docs`. Hlavní endpointy:
 
 ## Úpravy mapy
 
-Tlačítko „Upravit mapu“ přepne do editoru: přesun uzlů a popisků tažením (oblast se přesouvá
-i s uzly uvnitř), přidání uzlu, spoje a popisku, úprava vlastností v pravém panelu, správa typů
-spojů, Zpět/Znovu (Ctrl+Z / Ctrl+Shift+Z), mazání klávesou Delete. Změny se drží v prohlížeči
-a až „Uložit“ vytvoří novou revizi.
+Tlačítko „Upravit mapu“ přepne do editoru (ovládání je v levém panelu):
 
-Vybraný uzel, spoj či zobrazená revize jsou v adrese za `#` (např. `#spoj=…`, `#revize=3`),
-odkaz lze poslat dál a funguje tlačítko Zpět v prohlížeči.
+- přesun uzlů a popisků tažením; oblast se přesouvá i s uzly a menšími oblastmi uvnitř
+- velikost uzlu se mění tažením rohů vybraného uzlu
+- lomený spoj: body lomu se táhnou, tažením „+“ přibude nový bod, dvojklik bod odebere,
+  zaoblení rohů se nastaví v panelu
+- přidání uzlu, spoje a popisku, úprava vlastností, správa typů spojů
+- Zpět/Znovu (Ctrl+Z / Ctrl+Shift+Z), mazání klávesou Delete
+
+Změny se drží v prohlížeči a až „Uložit“ vytvoří novou revizi.
+
+Typ spoje označený jako **vzdálený spoj** (např. „datová konektivita“, pronajatá optika mimo síť
+hkfree) se nekreslí přes celou mapu, ale jen jako krátké konce u obou uzlů s názvem protější
+strany. Kliknutím na kterýkoli konec se vybere celý spoj a zvýrazní se obě strany.
+
+Vybraný uzel, spoj či zobrazená revize jsou v adrese za `#` (např. `#uzel=183-natura`,
+`#spoj=183-natura--4-pmv-igw`, `#revize=3`), odkaz lze poslat dál a funguje tlačítko Zpět.
+Id vznikne z názvu při prvním uložení a dál se nemění (ani při přejmenování), aby odkazy
+a historie zůstaly platné. Spoj má id podle svých koncových uzlů.
 
 ## Kontejner (podman i docker)
 

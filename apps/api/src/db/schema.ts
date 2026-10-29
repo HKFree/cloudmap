@@ -15,6 +15,7 @@ export interface LinkTypeTable {
   dash: string;
   description: string;
   sort_order: number;
+  remote: number;
 }
 
 export interface NodeTypeTable {
@@ -49,8 +50,8 @@ export interface LinkTable {
   to_node_id: string;
   shape: string;
   curvature: number;
+  corner_radius: number;
   capacity: string;
-  technology: string;
   label_x: number | null;
   label_y: number | null;
   note: string;

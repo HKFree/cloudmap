@@ -15,6 +15,11 @@ export const linkTypeSchema = z.object({
   dash: z.string(),
   description: z.string(),
   sortOrder: z.number().int(),
+  /**
+   * Leased connectivity between two distant sites (outside hkfree infrastructure).
+   * Such links are drawn only as short stubs at both ends instead of a line across the map.
+   */
+  remote: z.boolean().default(false),
 });
 
 export const nodeTypeSchema = z.object({
@@ -53,12 +58,15 @@ export const mapLinkSchema = z.object({
   shape: z.enum(linkShapes),
   /** Arc bulge as a fraction of the chord length, positive = left of the from→to direction. */
   curvature: z.number(),
-  /** Bezier control points or polyline vertices between the two endpoints. */
+  /**
+   * Bezier control points or polyline vertices between the two endpoints.
+   * For links of a remote type: the outer ends of the from and to stubs.
+   */
   points: z.array(pointSchema),
+  /** Rounding of polyline corners in px. */
+  cornerRadius: z.number().nonnegative().default(0),
   /** Throughput, e.g. "250Mbps". */
   capacity: z.string(),
-  /** Radio band, hardware or provider, e.g. "10GHz", "AF-5X", "VDF". */
-  technology: z.string(),
   labelX: z.number().nullable(),
   labelY: z.number().nullable(),
   note: z.string(),
@@ -162,3 +170,4 @@ export type MapChanges = z.infer<typeof mapChangesSchema>;
 export type SaveChanges = z.input<typeof saveChangesSchema>;
 
 export { diffMaps, countChanges } from './diff';
+export { assignReadableIds, isTemporaryId, slugify, temporaryId, uniqueId } from './ids';
