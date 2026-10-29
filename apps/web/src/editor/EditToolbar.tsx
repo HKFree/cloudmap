@@ -5,9 +5,9 @@ export type Tool = 'select' | 'addNode' | 'addLink' | 'addLabel';
 
 const tools: { id: Tool; name: string; hint: string }[] = [
   { id: 'select', name: 'Výběr', hint: 'Klik vybere, tažení přesune.' },
-  { id: 'addNode', name: '+ Uzel', hint: 'Klikněte do mapy, kam uzel umístit.' },
-  { id: 'addLink', name: '+ Spoj', hint: 'Klikněte postupně na dva uzly, které spoj propojí.' },
-  { id: 'addLabel', name: '+ Popisek', hint: 'Klikněte do mapy, kam popisek umístit.' },
+  { id: 'addNode', name: '+ Uzel', hint: 'Klikni do mapy, kam uzel umístit.' },
+  { id: 'addLink', name: '+ Spoj', hint: 'Klikni postupně na dva uzly, které spoj propojí.' },
+  { id: 'addLabel', name: '+ Popisek', hint: 'Klikni do mapy, kam popisek umístit.' },
 ];
 
 interface Props {

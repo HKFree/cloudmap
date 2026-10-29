@@ -11,6 +11,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
+import { registerAuth, type AuthConfig } from './auth/auth';
 import type { Db } from './db/connection';
 import { mapRoutes } from './routes/map';
 import { metaRoutes } from './routes/meta';
@@ -18,11 +19,12 @@ import { metaRoutes } from './routes/meta';
 export interface AppOptions {
   db: Db;
   version: string;
+  auth: AuthConfig;
   staticDir?: string;
   logger?: boolean;
 }
 
-export async function buildApp({ db, version, staticDir, logger = false }: AppOptions) {
+export async function buildApp({ db, version, auth, staticDir, logger = false }: AppOptions) {
   const app = Fastify({ logger }).withTypeProvider<ZodTypeProvider>();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -37,6 +39,8 @@ export async function buildApp({ db, version, staticDir, logger = false }: AppOp
     routePrefix: '/api/v1/docs',
     ...(existsSync(bundledSwaggerUi) ? { baseDir: bundledSwaggerUi } : {}),
   });
+
+  await registerAuth(app, auth);
 
   app.get('/healthz', { schema: { hide: true } }, async () => ({ ok: true }));
   await app.register(metaRoutes({ version }), { prefix: '/api/v1' });

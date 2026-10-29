@@ -11,7 +11,7 @@ describe('API', () => {
   beforeAll(async () => {
     db = await openDatabase('sqlite::memory:');
     await importDia(db, sampleDiagram());
-    app = await buildApp({ db, version: '1.2.3' });
+    app = await buildApp({ db, version: '1.2.3', auth: { devMode: true, apiKeys: [] } });
   });
 
   afterAll(async () => {

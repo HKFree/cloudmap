@@ -180,14 +180,22 @@ export function App() {
     setNewLinkTypeId((id) => id || current.linkTypes[0]?.id || '');
     setSaveError(null);
     setShowSidebar(true);
+    setShowHistory(false);
     editor.start(current);
   };
 
-  const finishEditing = () => {
-    if (editor.changeCount > 0 && !confirm('Máte neuložené změny. Opravdu je zahodit?')) return;
+  const finishEditing = (question = 'Máš neuložené změny. Opravdu je zahodit?') => {
+    if (editor.changeCount > 0 && !confirm(question)) return;
     setCheckingBeforeSave(false);
     editor.stop();
     changeTool('select');
+  };
+
+  /** The logo leads "home": out of the editor, or to the whole map. */
+  const onLogoClick = () => {
+    if (!editing) return mapRef.current?.fit();
+    if (editor.changeCount > 0) finishEditing('Ukončit úpravy? Máš neuložené změny, které se zahodí.');
+    else if (confirm('Ukončit úpravy mapy?')) finishEditing();
   };
 
   const discardChanges = () => {
@@ -285,8 +293,13 @@ export function App() {
         else if (selection && !typing) select(null);
         return;
       }
-      if (typing || !editing) return;
+      if (typing) return;
       const key = e.key.toLowerCase();
+      if (key === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        mapRef.current?.fit();
+        return;
+      }
+      if (!editing) return;
       if ((e.ctrlKey || e.metaKey) && (key === 'z' || key === 'y')) {
         e.preventDefault();
         if (key === 'y' || e.shiftKey) editor.redo();
@@ -321,11 +334,13 @@ export function App() {
           ☰
         </button>
         <h1>
-          <img src="/logo.svg" alt="hkfree" height={44} /> <span>cloudmap</span>
+          <button type="button" className="logo" onClick={onLogoClick} title={editing ? 'Ukončit úpravy' : 'Zobrazit celou mapu'}>
+            <img src="/logo.svg" alt="hkfree" height={44} /> <span>cloudmap</span>
+          </button>
         </h1>
         {shown && <SearchBox nodes={shown.nodes} onSelect={(node) => select({ kind: 'node', id: node.id }, true)} />}
-        <button type="button" onClick={() => mapRef.current?.fit()} disabled={!shown} title="Zobrazit celou mapu">
-          Vycentrovat
+        <button type="button" onClick={() => mapRef.current?.fit()} disabled={!shown} title="Zobrazit celou mapu (klávesa C)">
+          Vycentrovat <kbd>C</kbd>
         </button>
       </header>
 
@@ -333,7 +348,7 @@ export function App() {
         <div className="banner">
           {viewed?.revision ? (
             <>
-              {isLatestViewed ? 'Aktuální verze mapy' : 'Prohlížíte starší verzi mapy'}: revize #{viewed.revision.id} z{' '}
+              {isLatestViewed ? 'Aktuální verze mapy' : 'Prohlížíš starší verzi mapy'}: revize #{viewed.revision.id} z{' '}
               {dateFormat.format(new Date(viewed.revision.createdAt))}
               {viewed.revision.message && ` – ${viewed.revision.message}`}
             </>
@@ -356,11 +371,17 @@ export function App() {
         {shown && showSidebar && (
           <aside className="sidebar">
             <div className="toolbar-row">
-              <button type="button" className={showHistory ? 'active' : undefined} onClick={() => setShowHistory((v) => !v)}>
-                Historie
-              </button>
-              <span className="spacer" />
               {!editing && (
+                <button type="button" className={showHistory ? 'active' : undefined} onClick={() => setShowHistory((v) => !v)}>
+                  Historie
+                </button>
+              )}
+              <span className="spacer" />
+              {editing ? (
+                <button type="button" onClick={() => finishEditing()}>
+                  Ukončit úpravy
+                </button>
+              ) : (
                 <button type="button" className="primary" onClick={startEditing} disabled={!current}>
                   Upravit mapu
                 </button>
@@ -382,7 +403,7 @@ export function App() {
                 error={saveError}
                 onSave={requestSave}
                 onDiscard={discardChanges}
-                onFinish={finishEditing}
+                onFinish={() => finishEditing()}
               />
             )}
             {editing && topology && baseTopology && (
@@ -411,14 +432,11 @@ export function App() {
                 }}
               />
             )}
-            {showHistory && (
+            {showHistory && !editing && (
               <HistoryPanel
                 viewedRevision={revision}
                 latestRevision={current?.revision?.id ?? null}
-                onView={(id) => {
-                  if (editing && id !== null) return alert('Starší verze lze prohlížet až po ukončení úprav.');
-                  navigate({ selection, revision: id });
-                }}
+                onView={(id) => navigate({ selection, revision: id })}
                 onClose={() => setShowHistory(false)}
               />
             )}
@@ -444,7 +462,7 @@ export function App() {
                   onToggleLinkType={toggleLinkType}
                 />
               </svg>
-              <p className="hint">Kliknutím na typ spoje jej skryjete nebo zobrazíte.</p>
+              <p className="hint">Kliknutím na typ spoje ho skryješ nebo zobrazíš.</p>
             </details>
             <AppInfo data={shown} />
           </aside>
@@ -453,7 +471,7 @@ export function App() {
           {error && <div className="message error">{error}</div>}
           {!shown && !error && <div className="message">Načítám mapu…</div>}
           {shown && shown.nodes.length === 0 && !editing && (
-            <div className="message">Mapa je prázdná. Naimportujte data z Dia diagramu, nebo ji začněte kreslit.</div>
+            <div className="message">Mapa je prázdná. Naimportuj data z Dia diagramu, nebo ji začni kreslit.</div>
           )}
           {shown && (
             <MapView

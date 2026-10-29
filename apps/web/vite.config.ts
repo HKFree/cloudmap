@@ -10,6 +10,6 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    proxy: { '/api': 'http://localhost:8080' },
+    proxy: { '/api': 'http://localhost:8080', '/auth': 'http://localhost:8080' },
   },
 });

@@ -139,11 +139,22 @@ export const saveChangesSchema = mapChangesSchema.extend({
   /** Revision the client started editing from; saving fails if the map changed since. */
   baseRevisionId: z.number().int().nullable(),
   message: z.string().max(500).default(''),
-  author: z.string().max(255).default(''),
 });
 
 export const restoreRevisionSchema = z.object({
   message: z.string().max(500).default(''),
+});
+
+export const userSchema = z.object({
+  /** UserDB id from the hkfree SSO, "dev" in dev mode or "api:<name>" for API keys. */
+  id: z.string(),
+  name: z.string(),
+});
+
+export const currentUserSchema = z.object({
+  user: userSchema,
+  /** Login is disabled and every change is recorded as made by "dev". */
+  devMode: z.boolean(),
 });
 
 export const metaSchema = z.object({
@@ -168,6 +179,8 @@ export type RevisionSummary = z.infer<typeof revisionSummarySchema>;
 export type MapCollection = (typeof mapCollections)[number];
 export type MapChanges = z.infer<typeof mapChangesSchema>;
 export type SaveChanges = z.input<typeof saveChangesSchema>;
+export type User = z.infer<typeof userSchema>;
+export type CurrentUser = z.infer<typeof currentUserSchema>;
 
 export { diffMaps, countChanges } from './diff';
 export { assignReadableIds, isTemporaryId, slugify, temporaryId, uniqueId } from './ids';

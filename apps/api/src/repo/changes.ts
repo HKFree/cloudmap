@@ -57,11 +57,11 @@ export async function saveChanges(db: Db, input: SaveInput): Promise<Revision> {
 }
 
 /** Creates a new revision whose content equals the map right after revision `revisionId`. */
-export async function restoreRevision(db: Db, revisionId: number, message: string): Promise<Revision | null> {
+export async function restoreRevision(db: Db, revisionId: number, message: string, author: string): Promise<Revision | null> {
   if (!(await getRevision(db, revisionId))) return null;
 
   return withForeignKeyErrors(() =>
-    commitChanges(db, { message: message.trim() || `Obnovení revize #${revisionId}` }, async (trx) => {
+    commitChanges(db, { message: message.trim() || `Obnovení revize #${revisionId}`, author }, async (trx) => {
       const changeset: Required<Changeset> = { upsert: {}, delete: {} };
       for (const table of versionedTables) {
         const [past, current] = await Promise.all([readTable(trx, table, revisionId), readTable(trx, table)]);

@@ -56,6 +56,18 @@ button:disabled {
   color: var(--accent);
 }
 
+.header .logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
 .header h1 span {
   color: #1f2328;
   font-weight: normal;
@@ -295,6 +307,13 @@ dd {
 
 .app-info a {
   color: #0969da;
+}
+
+.dev-mode {
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #fff8c5;
+  color: #7d4e00;
 }
 
 .spacer {

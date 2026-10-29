@@ -29,7 +29,8 @@ ENV NODE_ENV=production \
     LISTEN_HOST=0.0.0.0 \
     PORT=8080 \
     DATABASE_URL=sqlite:/data/cloudmap.db \
-    STATIC_DIR=/app/web
+    STATIC_DIR=/app/web \
+    API_KEYS_FILE=/data/api-keys.json
 
 WORKDIR /app
 COPY --from=build /src/apps/api/dist ./api
