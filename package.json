@@ -1,0 +1,31 @@
+{
+  "name": "cloudmap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "hkfree.org cloudmap – mapa páteřní sítě",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "tsx watch apps/api/src/server.ts",
+    "dev:web": "npm run dev -w @cloudmap/web",
+    "build": "npm run build -w @cloudmap/web && npm run build -w @cloudmap/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "import:dia": "tsx apps/api/src/cli/import-dia.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

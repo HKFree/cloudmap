@@ -1,0 +1,28 @@
+# Works with `podman compose`, `podman-compose` and `docker compose`.
+#
+#   podman compose up --build -d      # local build, http://0.0.0.0:8080
+#   CLOUDMAP_IMAGE=ghcr.io/hkfree/cloudmap:0.1.0 podman compose up -d --no-build
+
+name: cloudmap
+
+services:
+  cloudmap:
+    image: ${CLOUDMAP_IMAGE:-localhost/cloudmap:dev}
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-}
+    ports:
+      - "0.0.0.0:${CLOUDMAP_PORT:-8080}:8080"
+    volumes:
+      - cloudmap-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  cloudmap-data:

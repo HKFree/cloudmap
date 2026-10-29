@@ -1,0 +1,108 @@
+import { z } from 'zod';
+
+export const nodeShapes = ['cloud', 'ellipse', 'point'] as const;
+export const linkShapes = ['straight', 'arc', 'bezier', 'polyline'] as const;
+export const labelAligns = ['left', 'center', 'right'] as const;
+
+const id = z.string().min(1);
+const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+export const linkTypeSchema = z.object({
+  id,
+  name: z.string().min(1),
+  color,
+  width: z.number().positive(),
+  dash: z.string(),
+  description: z.string(),
+  sortOrder: z.number().int(),
+});
+
+export const nodeTypeSchema = z.object({
+  id,
+  name: z.string().min(1),
+  shape: z.enum(nodeShapes),
+  fillColor: color.nullable(),
+  strokeColor: color,
+  isArea: z.boolean(),
+  description: z.string(),
+  sortOrder: z.number().int(),
+});
+
+export const pointSchema = z.object({ x: z.number(), y: z.number() });
+
+export const mapNodeSchema = z.object({
+  id,
+  typeId: id,
+  label: z.string(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().nonnegative(),
+  height: z.number().nonnegative(),
+  fontSize: z.number().positive(),
+  /** Offset of the label centre from the node centre. */
+  labelDx: z.number(),
+  labelDy: z.number(),
+  note: z.string(),
+});
+
+export const mapLinkSchema = z.object({
+  id,
+  typeId: id,
+  fromNodeId: id,
+  toNodeId: id,
+  shape: z.enum(linkShapes),
+  /** Arc bulge as a fraction of the chord length, positive = left of the from→to direction. */
+  curvature: z.number(),
+  /** Bezier control points or polyline vertices between the two endpoints. */
+  points: z.array(pointSchema),
+  capacity: z.string(),
+  labelX: z.number().nullable(),
+  labelY: z.number().nullable(),
+  note: z.string(),
+});
+
+export const mapLabelSchema = z.object({
+  id,
+  text: z.string(),
+  x: z.number(),
+  y: z.number(),
+  fontSize: z.number().positive(),
+  bold: z.boolean(),
+  color,
+  /** x is the anchor according to align, y is the vertical centre of the text block. */
+  align: z.enum(labelAligns),
+});
+
+export const revisionSchema = z.object({
+  id: z.number().int(),
+  createdAt: z.string(),
+  author: z.string(),
+  message: z.string(),
+});
+
+export const mapDataSchema = z.object({
+  revision: revisionSchema.nullable(),
+  linkTypes: z.array(linkTypeSchema),
+  nodeTypes: z.array(nodeTypeSchema),
+  nodes: z.array(mapNodeSchema),
+  links: z.array(mapLinkSchema),
+  labels: z.array(mapLabelSchema),
+});
+
+export const metaSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+});
+
+export type NodeShape = (typeof nodeShapes)[number];
+export type LinkShape = (typeof linkShapes)[number];
+export type LabelAlign = (typeof labelAligns)[number];
+export type LinkType = z.infer<typeof linkTypeSchema>;
+export type NodeType = z.infer<typeof nodeTypeSchema>;
+export type Point = z.infer<typeof pointSchema>;
+export type MapNode = z.infer<typeof mapNodeSchema>;
+export type MapLink = z.infer<typeof mapLinkSchema>;
+export type MapLabel = z.infer<typeof mapLabelSchema>;
+export type Revision = z.infer<typeof revisionSchema>;
+export type MapData = z.infer<typeof mapDataSchema>;
+export type Meta = z.infer<typeof metaSchema>;
