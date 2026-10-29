@@ -75,4 +75,4 @@ a zobrazuje se v patičce aplikace.
 2. `git tag v0.2.0 && git push --tags`
 3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.2.0` (+ `:0.2`, `:latest`) a GitHub release
 
-Každý push do `master` vydá image `:edge` pro testování.
+Každý push do `main` vydá image `:edge` pro testování.

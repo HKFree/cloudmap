@@ -1,12 +1,12 @@
 name: Release
 
 # Pushing a tag vX.Y.Z publishes ghcr.io/hkfree/cloudmap:X.Y.Z, :X.Y and :latest.
-# Pushes to master publish :edge for testing before a release.
+# Pushes to main publish :edge for testing before a release.
 
 on:
   push:
     tags: ['v*']
-    branches: [master]
+    branches: [main]
 
 permissions:
   contents: write
@@ -57,7 +57,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
-            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
           labels: |
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
 
