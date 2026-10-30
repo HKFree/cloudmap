@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MapLink } from '@cloudmap/shared';
-import { cloudPath, linkPath, stubEnds } from './geometry';
+import { cloudPath, linkMidpoint, linkPath, stubEnds } from './geometry';
 
 const link = (patch: Partial<MapLink>): MapLink => ({
   id: 'l',
@@ -37,6 +37,17 @@ describe('geometry', () => {
   it('draws bezier links through their control points', () => {
     const d = linkPath(link({ shape: 'bezier', points: [{ x: 10, y: 10 }, { x: 20, y: 10 }] }), { x: 0, y: 0 }, { x: 30, y: 0 });
     expect(d).toBe('M0.0 0.0C10.0 10.0 20.0 10.0 30.0 0.0');
+  });
+
+  it('puts the default link label on the drawn line', () => {
+    const from = { x: 0, y: 0 };
+    const to = { x: 30, y: 0 };
+    const bezier = linkMidpoint(link({ shape: 'bezier', points: [{ x: 0, y: 40 }, { x: 30, y: 40 }] }), from, to);
+    expect(bezier.x).toBeCloseTo(15);
+    expect(bezier.y).toBeCloseTo(30, 0);
+    const polyline = linkMidpoint(link({ shape: 'polyline', points: [{ x: 0, y: 30 }] }), from, { x: 30, y: 30 });
+    expect(polyline).toEqual({ x: 0, y: 30 });
+    expect(linkMidpoint(link({ shape: 'polyline', points: [{ x: 0, y: 10 }] }), from, { x: 90, y: 10 })).toEqual({ x: 40, y: 10 });
   });
 
   it('rounds polyline corners', () => {

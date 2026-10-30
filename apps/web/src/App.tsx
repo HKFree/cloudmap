@@ -160,11 +160,28 @@ export function App() {
     if (bounds) mapRef.current?.focus(bounds);
   };
 
+  // On a phone the panel opens to show a selected item's detail and closes with the selection.
+  const sidebarOpenedForDetail = useRef(false);
+  const toggleSidebar = (open: boolean) => {
+    sidebarOpenedForDetail.current = false;
+    setShowSidebar(open);
+  };
+
   const select = (item: ItemRef | null, focus = false) => {
     navigate({ selection: item, revision });
-    if (item && narrowScreen) setShowSidebar(true);
+    if (item && narrowScreen && !showSidebar) {
+      setShowSidebar(true);
+      sidebarOpenedForDetail.current = true;
+    }
+    if (!item && sidebarOpenedForDetail.current) toggleSidebar(false);
     if (item && focus) focusItem(item);
   };
+
+  // The detail is at the top of the panel on a phone, so a new selection scrolls back to it.
+  const sidebarRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (narrowScreen) sidebarRef.current?.scrollTo({ top: 0 });
+  }, [selection?.kind, selection?.id, narrowScreen]);
 
   // Selections coming from the URL (shared link, back/forward) bring the item into view.
   const focusedNavigation = useRef(0);
@@ -191,7 +208,7 @@ export function App() {
     if (revision) navigate({ selection, revision: null });
     setNewLinkTypeId((id) => id || current.linkTypes[0]?.id || '');
     setSaveError(null);
-    setShowSidebar(true);
+    toggleSidebar(true);
     setShowHistory(false);
     editor.start(current);
   };
@@ -332,6 +349,17 @@ export function App() {
 
   const searchBox = shown && <SearchBox nodes={shown.nodes} onSelect={(node) => select({ kind: 'node', id: node.id }, true)} />;
 
+  const detailPanel = shown && selection && (
+    <DetailPanel
+      data={shown}
+      selection={selection}
+      editor={editing ? editor : undefined}
+      onSelect={select}
+      onDelete={deleteSelected}
+      onClose={() => select(null)}
+    />
+  );
+
   const legendSvgHeight = shown ? legendHeight(shown.linkTypes, shown.nodeTypes, false) : 0;
 
   const isLatestViewed = revision !== null && revision === current?.revision?.id;
@@ -349,7 +377,7 @@ export function App() {
         <button
           type="button"
           className={showSidebar ? 'active' : undefined}
-          onClick={() => setShowSidebar((v) => !v)}
+          onClick={() => toggleSidebar(!showSidebar)}
           title={showSidebar ? 'Skrýt panel' : 'Zobrazit panel'}
         >
           ☰
@@ -390,7 +418,8 @@ export function App() {
 
       <div className="workspace">
         {shown && showSidebar && (
-          <aside className="sidebar">
+          <aside className="sidebar" ref={sidebarRef}>
+            {narrowScreen && detailPanel}
             {narrowScreen && searchBox}
             <div className="toolbar-row">
               {!editing && (
@@ -462,16 +491,7 @@ export function App() {
                 onClose={() => setShowHistory(false)}
               />
             )}
-            {selection && (
-              <DetailPanel
-                data={shown}
-                selection={selection}
-                editor={editing ? editor : undefined}
-                onSelect={select}
-                onDelete={deleteSelected}
-                onClose={() => select(null)}
-              />
-            )}
+            {!narrowScreen && detailPanel}
             {editing && <LinkTypesPanel data={shown} editor={editor} />}
             <details className="panel" open={!editing}>
               <summary>Legenda</summary>

@@ -42,7 +42,10 @@ export function AppInfo({ data }: { data: MapData | null }) {
       </div>
       {current && <UserRow current={current} />}
       <div className="muted small">
-        hkfree cloudmap v{__APP_VERSION__} · pro hkfree.org vyrobil OndraLhota
+        <a href="https://github.com/HKFree/cloudmap" target="_blank" rel="noreferrer">
+          hkfree cloudmap
+        </a>{' '}
+        v{__APP_VERSION__} · pro hkfree.org vyrobil OndraLhota
       </div>
     </section>
   );
