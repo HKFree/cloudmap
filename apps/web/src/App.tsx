@@ -11,6 +11,7 @@ import { TopologyCheckPanel } from './editor/TopologyCheckPanel';
 import { createLabel, createLink, createNode, deleteItem, moveItem, removeLinkPoint, upsertItem, type ItemRef } from './editor/operations';
 import { useEditor } from './editor/useEditor';
 import { useHashState } from './hash';
+import { NARROW_SCREEN, useMediaQuery } from './useMediaQuery';
 import { describeRevision, emptyMap, itemRefOf, type ItemChange } from './history/revisionChanges';
 import { RevisionChangesPanel } from './history/RevisionChangesPanel';
 import type { Bounds } from './map/geometry';
@@ -50,7 +51,9 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [hiddenLinkTypes, setHiddenLinkTypes] = useState<ReadonlySet<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const narrowScreen = useMediaQuery(NARROW_SCREEN);
+  // On a phone the panel covers part of the map, so it opens only when needed.
+  const [showSidebar, setShowSidebar] = useState(() => !window.matchMedia(NARROW_SCREEN).matches);
   const mapRef = useRef<MapViewHandle>(null);
 
   const editor = useEditor();
@@ -151,6 +154,7 @@ export function App() {
 
   const select = (item: ItemRef | null, focus = false) => {
     navigate({ selection: item, revision });
+    if (item && narrowScreen) setShowSidebar(true);
     if (item && focus) focusItem(item);
   };
 
@@ -313,6 +317,10 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
+  const searchBox = shown && <SearchBox nodes={shown.nodes} onSelect={(node) => select({ kind: 'node', id: node.id }, true)} />;
+
+  const legendSvgHeight = shown ? legendHeight(shown.linkTypes, shown.nodeTypes, false) : 0;
+
   const isLatestViewed = revision !== null && revision === current?.revision?.id;
 
   const toggleLinkType = (id: string) =>
@@ -338,8 +346,8 @@ export function App() {
             <img src="/logo.svg" alt="hkfree" height={44} /> <span>cloudmap</span>
           </button>
         </h1>
-        {shown && <SearchBox nodes={shown.nodes} onSelect={(node) => select({ kind: 'node', id: node.id }, true)} />}
-        <button type="button" onClick={() => mapRef.current?.fit()} disabled={!shown} title="Zobrazit celou mapu (klávesa C)">
+        {!narrowScreen && searchBox}
+        <button type="button" className="fit-button" onClick={() => mapRef.current?.fit()} disabled={!shown} title="Zobrazit celou mapu (klávesa C)">
           Vycentrovat <kbd>C</kbd>
         </button>
       </header>
@@ -370,6 +378,7 @@ export function App() {
       <div className="workspace">
         {shown && showSidebar && (
           <aside className="sidebar">
+            {narrowScreen && searchBox}
             <div className="toolbar-row">
               {!editing && (
                 <button type="button" className={showHistory ? 'active' : undefined} onClick={() => setShowHistory((v) => !v)}>
@@ -453,7 +462,12 @@ export function App() {
             {editing && <LinkTypesPanel data={shown} editor={editor} />}
             <details className="panel" open={!editing}>
               <summary>Legenda</summary>
-              <svg width={LEGEND_WIDTH} height={legendHeight(shown.linkTypes, shown.nodeTypes, false)} className="legend">
+              <svg
+                width={LEGEND_WIDTH}
+                height={legendSvgHeight}
+                viewBox={`0 0 ${LEGEND_WIDTH} ${legendSvgHeight}`}
+                className="legend"
+              >
                 <Legend
                   linkTypes={shown.linkTypes}
                   nodeTypes={shown.nodeTypes}

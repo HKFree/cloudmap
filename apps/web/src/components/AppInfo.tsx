@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import type { CurrentUser, MapData } from '@cloudmap/shared';
 import { fetchCurrentUser } from '../api';
 
-const dateFormat = new Intl.DateTimeFormat('cs-CZ', { dateStyle: 'medium', timeStyle: 'short' });
-
-/** Version, revision and export at the bottom of the sidebar. */
+/** Version, author and export at the bottom of the sidebar. */
 export function AppInfo({ data }: { data: MapData | null }) {
   const [exporting, setExporting] = useState(false);
   const [current, setCurrent] = useState<CurrentUser | null>(null);
@@ -44,8 +42,7 @@ export function AppInfo({ data }: { data: MapData | null }) {
       </div>
       {current && <UserRow current={current} />}
       <div className="muted small">
-        hkfree cloudmap v{__APP_VERSION__}
-        {data?.revision && ` · revize #${data.revision.id} z ${dateFormat.format(new Date(data.revision.createdAt))}`}
+        hkfree cloudmap v{__APP_VERSION__} · pro hkfree.org vyrobil OndraLhota
       </div>
     </section>
   );

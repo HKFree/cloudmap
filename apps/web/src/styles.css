@@ -690,3 +690,69 @@ button.link-button {
   cursor: pointer;
   margin: 2px 0;
 }
+
+/* Keep the breakpoint in sync with NARROW_SCREEN in useMediaQuery.ts. */
+@media (max-width: 720px) {
+  .header {
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    min-width: 0;
+  }
+
+  .header h1 img {
+    height: 34px;
+  }
+
+  .fit-button {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .banner {
+    flex-wrap: wrap;
+    padding: 6px 8px;
+  }
+
+  /* The panel becomes a sheet below the map, so the map always keeps most of the screen. */
+  .workspace {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    order: 1;
+    width: 100%;
+    max-height: 50%;
+    border-right: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .search {
+    flex: none;
+  }
+
+  /* Inside the scrolling sheet a floating list would be clipped. */
+  .search-results {
+    position: static;
+  }
+
+  .search input {
+    font-size: 16px; /* smaller text makes iOS Safari zoom in on focus */
+  }
+
+  .legend {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Touch devices usually have no keyboard, so the shortcut hints are just noise. */
+@media (hover: none) and (pointer: coarse) {
+  kbd,
+  .shortcuts {
+    display: none;
+  }
+}

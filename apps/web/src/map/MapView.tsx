@@ -76,15 +76,19 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
     return { x, y };
   };
 
+  /** Returns false when the map has no size yet, e.g. while hidden behind a full-width panel. */
   const fitTo = (bounds: Bounds, maxScale = MAX_ZOOM) => {
     const svg = svgRef.current;
     const behavior = zoomRef.current;
-    if (!svg || !behavior) return;
+    if (!svg || !behavior) return false;
     const { width, height } = svg.getBoundingClientRect();
-    const scale = Math.min(width / (bounds.maxX - bounds.minX), height / (bounds.maxY - bounds.minY), maxScale);
+    if (width === 0 || height === 0) return false;
+    const fitScale = Math.min(width / (bounds.maxX - bounds.minX), height / (bounds.maxY - bounds.minY), maxScale);
+    const scale = Math.max(fitScale, MIN_ZOOM);
     const cx = (bounds.minX + bounds.maxX) / 2;
     const cy = (bounds.minY + bounds.maxY) / 2;
     select(svg).call(behavior.transform, zoomIdentity.translate(width / 2 - cx * scale, height / 2 - cy * scale).scale(scale));
+    return true;
   };
 
   useEffect(() => {
@@ -106,10 +110,15 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(props, 
       });
     zoomRef.current = behavior;
     select(svg).call(behavior).on('dblclick.zoom', null);
-    // Fit only once; a re-run must not override a focus requested meanwhile.
-    if (!initialFitDone.current) fitTo(boundsRef.current, 1);
-    initialFitDone.current = true;
+    // Fit only once, as soon as the map has a size; a re-run must not override a focus requested meanwhile.
+    const fitInitially = () => {
+      if (!initialFitDone.current) initialFitDone.current = fitTo(boundsRef.current, 1);
+    };
+    fitInitially();
+    const resizeObserver = new ResizeObserver(fitInitially);
+    resizeObserver.observe(svg);
     return () => {
+      resizeObserver.disconnect();
       select(svg).on('.zoom', null);
     };
   }, []);
