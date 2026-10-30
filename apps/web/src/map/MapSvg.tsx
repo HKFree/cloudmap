@@ -1,7 +1,7 @@
 import { memo, type ReactNode } from 'react';
-import type { LinkType, MapData, MapLabel, MapLink, MapNode, NodeType } from '@cloudmap/shared';
-import { areaMembers, type ItemRef } from '../editor/operations';
-import { cloudPath, linkLabelPosition, linkPath, stubEnds, type Bounds } from './geometry';
+import { linkNodeIds, type LinkType, type MapData, type MapLabel, type MapLink, type MapNode, type NodeType, type Point } from '@cloudmap/shared';
+import { areaMembers, isRemote, peerName, type ItemRef } from '../editor/operations';
+import { cloudPath, linkLabelPosition, linkPath, remoteStubs, type Bounds, type Stub } from './geometry';
 import { MultilineText } from './MultilineText';
 
 export interface MapHighlight {
@@ -64,10 +64,10 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
       <g>
         {visibleLinks.map((l) => {
           const from = nodes.get(l.fromNodeId);
-          const to = nodes.get(l.toNodeId);
+          const to = l.toNodeId === null ? null : nodes.get(l.toNodeId);
           const type = linkTypes.get(l.typeId);
-          if (!from || !to || !type) return null;
-          if (type.remote) {
+          if (!from || to === undefined || !type) return null;
+          if (isRemote(data, l)) {
             return (
               <RemoteLink
                 key={l.id}
@@ -81,6 +81,7 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
               />
             );
           }
+          if (!to) return null;
           return (
             <LinkLine
               key={l.id}
@@ -98,9 +99,9 @@ export function MapLayers({ data, highlight = {}, interactive = false, editing =
       <g>
         {visibleLinks.map((l) => {
           const from = nodes.get(l.fromNodeId);
-          const to = nodes.get(l.toNodeId);
+          const to = l.toNodeId === null ? null : nodes.get(l.toNodeId);
           const caption = l.capacity;
-          if (!caption || !from || !to || linkTypes.get(l.typeId)?.remote) return null;
+          if (!caption || !from || !to || isRemote(data, l)) return null;
           const at = linkLabelPosition(l, from, to);
           return (
             <g key={l.id} {...(interactive ? { 'data-kind': 'linkLabel', 'data-id': l.id } : {})}>
@@ -135,17 +136,17 @@ function focusSet(data: MapData, links: MapLink[], selection: ItemRef | null) {
     const nodes = new Set(centre);
     const linkIds = new Set<string>();
     for (const l of links) {
-      if (centre.has(l.fromNodeId) || centre.has(l.toNodeId)) {
+      const ends = linkNodeIds(l);
+      if (ends.some((id) => centre.has(id))) {
         linkIds.add(l.id);
-        nodes.add(l.fromNodeId);
-        nodes.add(l.toNodeId);
+        for (const id of ends) nodes.add(id);
       }
     }
     return { nodes, links: linkIds };
   }
   if (selection?.kind === 'link') {
     const link = links.find((l) => l.id === selection.id);
-    if (link) return { nodes: new Set([link.fromNodeId, link.toNodeId]), links: new Set([link.id]) };
+    if (link) return { nodes: new Set(linkNodeIds(link)), links: new Set([link.id]) };
   }
   return undefined;
 }
@@ -254,7 +255,10 @@ const LinkLine = memo(function LinkLine({
 
 const STUB_CAPTION_SIZE = 13;
 
-/** Leased line drawn as two stubs, each captioned with the site at the other end. */
+/**
+ * Leased line drawn as two stubs, each captioned with the site at the other end.
+ * An external uplink has one stub ending in an arrow, captioned with the provider.
+ */
 const RemoteLink = memo(function RemoteLink({
   link,
   from,
@@ -266,28 +270,30 @@ const RemoteLink = memo(function RemoteLink({
 }: {
   link: MapLink;
   from: MapNode;
-  to: MapNode;
+  to: MapNode | null;
   type: LinkType;
   opacity: number;
   selected: boolean;
   interactive: boolean;
 }) {
-  const ends = stubEnds(link, from, to);
-  const stubs = [
-    { start: from, end: ends[0], other: to },
-    { start: to, end: ends[1], other: from },
-  ];
+  const stubs = remoteStubs(link, from, to);
+  const arrowSize = Math.max(type.width * 2.5, 14);
+  const farEnd = (i: number) => (to ? `↔ ${oneLine((i === 0 ? to : from).label) || '?'}` : `↗ ${peerName(link)}`);
   return (
     <g opacity={opacity}>
-      {stubs.map(({ start, end, other }, i) => {
+      {stubs.map(({ start, end }, i) => {
         const d = `M${start.x} ${start.y}L${end.x} ${end.y}`;
-        const caption = [`↔ ${oneLine(other.label) || '?'}`, link.capacity].filter(Boolean).join('\n');
-        const at = stubCaptionPlacement(start, end, caption.split('\n').length);
+        const caption = [farEnd(i), link.capacity].filter(Boolean).join('\n');
+        const at = stubCaptionPlacement(start, end, caption.split('\n').length, to ? 12 : arrowSize + 6);
         return (
           <g key={i}>
             {selected && <path d={d} fill="none" stroke={SELECTION_COLOR} strokeWidth={type.width + 10} strokeLinecap="round" />}
             <path d={d} fill="none" stroke={type.color} strokeWidth={type.width} strokeDasharray={type.dash || undefined} />
-            <circle cx={end.x} cy={end.y} r={Math.max(type.width, 4)} fill="#ffffff" stroke={type.color} strokeWidth={2} />
+            {to ? (
+              <circle cx={end.x} cy={end.y} r={Math.max(type.width, 4)} fill="#ffffff" stroke={type.color} strokeWidth={2} />
+            ) : (
+              <path d={arrowHead({ start, end }, arrowSize)} fill={type.color} />
+            )}
             {interactive && (
               <path data-kind="link" data-id={link.id} d={d} fill="none" stroke="transparent" strokeWidth={Math.max(type.width, 14)} />
             )}
@@ -310,12 +316,21 @@ const RemoteLink = memo(function RemoteLink({
   );
 });
 
-/** Caption just beyond the stub end, aligned so it extends away from the node. */
-function stubCaptionPlacement(start: MapNode, end: { x: number; y: number }, lines: number) {
+/** Triangle with its tip `size` px beyond the stub end, pointing away from the node. */
+function arrowHead({ start, end }: Stub, size: number) {
   const length = Math.hypot(end.x - start.x, end.y - start.y) || 1;
   const ux = (end.x - start.x) / length;
   const uy = (end.y - start.y) / length;
-  const gap = 12;
+  const tip = { x: end.x + ux * size, y: end.y + uy * size };
+  const half = size * 0.6;
+  return `M${tip.x} ${tip.y}L${end.x - uy * half} ${end.y + ux * half}L${end.x + uy * half} ${end.y - ux * half}Z`;
+}
+
+/** Caption just beyond the stub end, aligned so it extends away from the node. */
+function stubCaptionPlacement(start: Point, end: Point, lines: number, gap: number) {
+  const length = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+  const ux = (end.x - start.x) / length;
+  const uy = (end.y - start.y) / length;
   if (Math.abs(ux) > 0.4) {
     return { x: end.x + ux * gap, y: end.y + uy * gap, align: ux > 0 ? ('left' as const) : ('right' as const) };
   }

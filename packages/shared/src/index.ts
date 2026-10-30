@@ -18,6 +18,7 @@ export const linkTypeSchema = z.object({
   /**
    * Leased connectivity between two distant sites (outside hkfree infrastructure).
    * Such links are drawn only as short stubs at both ends instead of a line across the map.
+   * A link of this type may also lead out of the map, see `MapLink.toNodeId`.
    */
   remote: z.boolean().default(false),
 });
@@ -54,19 +55,23 @@ export const mapLinkSchema = z.object({
   id,
   typeId: id,
   fromNodeId: id,
-  toNodeId: id,
+  /** Null for an external uplink of a remote type: connectivity to a provider outside the map. */
+  toNodeId: id.nullable(),
   shape: z.enum(linkShapes),
   /** Arc bulge as a fraction of the chord length, positive = left of the from→to direction. */
   curvature: z.number(),
   /**
    * Bezier control points or polyline vertices between the two endpoints.
-   * For links of a remote type: the outer ends of the from and to stubs.
+   * For links of a remote type: the outer ends of the from and to stubs,
+   * for an external uplink the outer end of its single stub.
    */
   points: z.array(pointSchema),
   /** Rounding of polyline corners in px. */
   cornerRadius: z.number().nonnegative().default(0),
   /** Throughput, e.g. "250Mbps". */
   capacity: z.string(),
+  /** Provider at the far end of an external uplink, e.g. "CETIN". */
+  peer: z.string().default(''),
   labelX: z.number().nullable(),
   labelY: z.number().nullable(),
   note: z.string(),
@@ -182,6 +187,7 @@ export type SaveChanges = z.input<typeof saveChangesSchema>;
 export type User = z.infer<typeof userSchema>;
 export type CurrentUser = z.infer<typeof currentUserSchema>;
 
+export { isExternalLink, linkNodeIds } from './links';
 export { diffMaps, countChanges } from './diff';
 export { assignReadableIds, isTemporaryId, slugify, temporaryId, uniqueId } from './ids';
 export { CORE_NODE_ID, checkTopology, hasTopologyProblems, linkedNodeIds, type TopologyProblems } from './topology';

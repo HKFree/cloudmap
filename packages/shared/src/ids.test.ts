@@ -27,7 +27,7 @@ describe('assignReadableIds', () => {
       links: [
         {
           id: temporaryId(), typeId: 'optika', fromNodeId: natura, toNodeId: pmv, shape: 'straight', curvature: 0,
-          points: [], cornerRadius: 0, capacity: '', labelX: null, labelY: null, note: '',
+          points: [], cornerRadius: 0, capacity: '', peer: '', labelX: null, labelY: null, note: '',
         },
       ],
       labels: [{ id: temporaryId(), text: 'Severní část', x: 0, y: 0, fontSize: 12, bold: false, color: '#000000', align: 'left' }],
@@ -38,5 +38,14 @@ describe('assignReadableIds', () => {
     expect(result.links[0]).toMatchObject({ id: '183-natura-2--4-pmv-igw', fromNodeId: '183-natura-2', toNodeId: '4-pmv-igw' });
     expect(result.labels[0]!.id).toBe('popisek-severni-cast');
     expect(renamed.get(natura)).toBe('183-natura-2');
+  });
+
+  it('names an external uplink after its provider', () => {
+    const uplink = (peer: string) => ({
+      id: temporaryId(), typeId: 't', fromNodeId: 'pmv', toNodeId: null, shape: 'straight' as const, curvature: 0,
+      points: [], cornerRadius: 0, capacity: '', peer, labelX: null, labelY: null, note: '',
+    });
+    const map = { linkTypes: [], nodeTypes: [], nodes: [], links: [uplink('CETIN a.s.'), uplink('')], labels: [] };
+    expect(assignReadableIds(map).map.links.map((l) => l.id)).toEqual(['pmv--cetin-a-s', 'pmv--mimo']);
   });
 });

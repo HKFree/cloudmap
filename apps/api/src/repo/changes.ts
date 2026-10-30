@@ -20,6 +20,7 @@ export async function saveChanges(db: Db, input: SaveInput): Promise<Revision> {
   for (const link of input.upsert.links) {
     if (link.fromNodeId === link.toNodeId) throw new ValidationError('Spoj nemůže vést z uzlu do téhož uzlu.');
   }
+  await checkExternalLinkTypes(db, input);
 
   return withForeignKeyErrors(() =>
     commitChanges(
@@ -75,6 +76,21 @@ export async function restoreRevision(db: Db, revisionId: number, message: strin
       return changeset;
     }),
   );
+}
+
+/** Only connectivity outside hkfree (a remote link type) may lead out of the map. */
+async function checkExternalLinkTypes(db: Db, { upsert }: MapChanges) {
+  const external = upsert.links.filter((l) => l.toNodeId === null);
+  if (external.length === 0) return;
+  const savedTypes = await db.selectFrom('link_type').select(['id', 'remote']).execute();
+  const remoteTypes = new Set([
+    ...savedTypes.filter((t) => t.remote).map((t) => t.id),
+    ...upsert.linkTypes.filter((t) => t.remote).map((t) => t.id),
+  ]);
+  for (const t of upsert.linkTypes) if (!t.remote) remoteTypes.delete(t.id);
+  if (external.some((l) => !remoteTypes.has(l.typeId))) {
+    throw new ValidationError('Mimo mapu může vést jen spoj typu konektivity mimo infrastrukturu hkfree.');
+  }
 }
 
 const coreNodeError = () => new ValidationError('Centrální uzel 4 PMV IGW nelze smazat.');

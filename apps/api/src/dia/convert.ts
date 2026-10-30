@@ -1,4 +1,4 @@
-import { assignReadableIds, temporaryId, type LinkType, type MapLabel, type MapLink, type MapNode, type NodeType, type Point } from '@cloudmap/shared';
+import { assignReadableIds, linkNodeIds, temporaryId, type LinkType, type MapLabel, type MapLink, type MapNode, type NodeType, type Point } from '@cloudmap/shared';
 import {
   attrBool,
   attrColor,
@@ -172,6 +172,7 @@ export function convertDia(objects: DiaObject[]): { map: ImportedMap; report: Im
         points: geometry.controlPoints.map(px),
         cornerRadius: 0,
         capacity: '',
+        peer: '',
         labelX: null,
         labelY: null,
         note: '',
@@ -220,12 +221,12 @@ function joinRemoteStubs(links: MapLink[], nodes: MapNode[], linkTypes: LinkType
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const isPoint = (id: string) => nodeById.get(id)?.typeId === NODE_TYPES.point.id;
   const linkCount = new Map<string, number>();
-  for (const l of links) for (const id of [l.fromNodeId, l.toNodeId]) linkCount.set(id, (linkCount.get(id) ?? 0) + 1);
+  for (const l of links) for (const id of linkNodeIds(l)) linkCount.set(id, (linkCount.get(id) ?? 0) + 1);
 
   const stubs: { link: MapLink; site: MapNode; end: MapNode }[] = [];
   for (const link of links) {
     if (!remoteTypes.has(link.typeId)) continue;
-    const ends = [link.fromNodeId, link.toNodeId];
+    const ends = linkNodeIds(link);
     const looseEnd = ends.find((id) => isPoint(id) && linkCount.get(id) === 1);
     const siteId = ends.find((id) => !isPoint(id));
     if (looseEnd && siteId) stubs.push({ link, site: nodeById.get(siteId)!, end: nodeById.get(looseEnd)! });

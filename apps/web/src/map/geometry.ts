@@ -84,6 +84,24 @@ export function stubEnds(link: MapLink, from: Point, to: Point): [Point, Point] 
   return [towards(from, to, length), towards(to, from, length)];
 }
 
+export interface Stub {
+  start: Point;
+  end: Point;
+}
+
+/**
+ * Stubs a remote link is drawn as, one at each node. An external uplink has a single stub
+ * leading out of the map, stored in `points` or pointing up by default.
+ */
+export function remoteStubs(link: MapLink, from: Point, to: Point | null): Stub[] {
+  if (!to) return [{ start: from, end: link.points[0] ?? { x: from.x, y: from.y - STUB_LENGTH } }];
+  const [fromEnd, toEnd] = stubEnds(link, from, to);
+  return [
+    { start: from, end: fromEnd },
+    { start: to, end: toEnd },
+  ];
+}
+
 /** Positive curvature bulges to the left of the from→to direction, which is a clockwise sweep on screen. */
 function arcPath(from: Point, to: Point, curvature: number): string {
   const chord = Math.hypot(to.x - from.x, to.y - from.y);

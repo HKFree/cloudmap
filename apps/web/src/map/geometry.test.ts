@@ -11,6 +11,7 @@ const link = (patch: Partial<MapLink>): MapLink => ({
   curvature: 0,
   points: [],
   capacity: '',
+  peer: '',
   cornerRadius: 0,
   labelX: null,
   labelY: null,

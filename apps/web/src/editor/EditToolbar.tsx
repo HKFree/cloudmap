@@ -30,7 +30,11 @@ interface Props {
 
 export function EditToolbar(props: Props) {
   const { data, editor, tool } = props;
-  const hint = tools.find((t) => t.id === tool)?.hint;
+  const remoteLinkType = data.linkTypes.some((t) => t.id === props.newLinkTypeId && t.remote);
+  const hint =
+    tool === 'addLink' && remoteLinkType
+      ? 'Klikni na dva uzly, nebo na uzel a pak do prázdna pro spoj mimo mapu (např. k poskytovateli).'
+      : tools.find((t) => t.id === tool)?.hint;
 
   return (
     <section className="panel edit-panel">

@@ -1,5 +1,5 @@
-import { temporaryId, type LinkType, type MapData, type MapLabel, type MapLink, type MapNode, type NodeType, type Point } from '@cloudmap/shared';
-import { linkLabelPosition, linkMidpoint, stubEnds } from '../map/geometry';
+import { linkNodeIds, temporaryId, type LinkType, type MapData, type MapLabel, type MapLink, type MapNode, type NodeType, type Point } from '@cloudmap/shared';
+import { linkLabelPosition, linkMidpoint, remoteStubs } from '../map/geometry';
 
 export type ItemKind = 'node' | 'link' | 'label';
 export interface ItemRef {
@@ -64,7 +64,8 @@ export function createNode(type: NodeType, at: Point): MapNode {
   };
 }
 
-export function createLink(fromNodeId: string, toNodeId: string, typeId: string): MapLink {
+/** Without `toNodeId` the link is an external uplink whose stub points to `outerEnd`. */
+export function createLink(fromNodeId: string, toNodeId: string | null, typeId: string, outerEnd?: Point): MapLink {
   return {
     id: temporaryId(),
     typeId,
@@ -72,9 +73,10 @@ export function createLink(fromNodeId: string, toNodeId: string, typeId: string)
     toNodeId,
     shape: 'straight',
     curvature: 0,
-    points: [],
+    points: outerEnd ? [{ x: round(outerEnd.x), y: round(outerEnd.y) }] : [],
     cornerRadius: 0,
     capacity: '',
+    peer: '',
     labelX: null,
     labelY: null,
     note: '',
@@ -111,7 +113,7 @@ export function deleteItem(map: MapData, ref: ItemRef): MapData {
       return {
         ...map,
         nodes: map.nodes.filter((n) => n.id !== ref.id),
-        links: map.links.filter((l) => l.fromNodeId !== ref.id && l.toNodeId !== ref.id),
+        links: map.links.filter((l) => !linkNodeIds(l).includes(ref.id)),
       };
     case 'link':
       return { ...map, links: map.links.filter((l) => l.id !== ref.id) };
@@ -152,7 +154,17 @@ export function areaMembers(map: MapData, area: MapNode): Set<string> {
 }
 
 export const isArea = (map: MapData, node: MapNode) => map.nodeTypes.some((t) => t.id === node.typeId && t.isArea);
-export const isRemote = (map: MapData, link: MapLink) => map.linkTypes.some((t) => t.id === link.typeId && t.remote);
+/** Caption of the far end of an external uplink. */
+export const peerName = (link: MapLink) => link.peer.trim() || 'mimo mapu';
+
+/** Link title like "Andre ↔ Andre 2", or "4 PMV IGW ↗ CETIN" for an external uplink. */
+export function linkTitle(link: MapLink, nodeName: (id: string) => string) {
+  return link.toNodeId === null ? `${nodeName(link.fromNodeId)} ↗ ${peerName(link)}` : `${nodeName(link.fromNodeId)} ↔ ${nodeName(link.toNodeId)}`;
+}
+
+/** Drawn as stubs instead of a line: leased connectivity and external uplinks. */
+export const isRemote = (map: MapData, link: MapLink) =>
+  link.toNodeId === null || map.linkTypes.some((t) => t.id === link.typeId && t.remote);
 
 /** Moves a dragged item by (dx, dy) relative to `map`, which is the state at drag start. */
 export function moveItem(map: MapData, ref: DragRef, dx: number, dy: number): MapData {
@@ -161,19 +173,21 @@ export function moveItem(map: MapData, ref: DragRef, dx: number, dy: number): Ma
       return { ...map, labels: map.labels.map((l) => (l.id === ref.id ? { ...l, x: round(l.x + dx), y: round(l.y + dy) } : l)) };
     case 'linkLabel':
       return updateLink(map, ref.id, (link, from, to) => {
+        if (!to) return {};
         const start = linkLabelPosition(link, from, to);
         return { labelX: round(start.x + dx), labelY: round(start.y + dy) };
       });
     case 'linkPoint': {
       const [linkId, index] = handleParts(ref.id);
       return updateLink(map, linkId, (link, from, to) => {
-        const points = isRemote(map, link) ? stubEnds(link, from, to) : link.points;
+        const points = isRemote(map, link) ? remoteStubs(link, from, to).map((s) => s.end) : link.points;
         return { points: points.map((p, i) => (i === Number(index) ? { x: round(p.x + dx), y: round(p.y + dy) } : p)) };
       });
     }
     case 'linkPointNew': {
       const [linkId, index] = handleParts(ref.id);
       return updateLink(map, linkId, (link, from, to) => {
+        if (!to) return {};
         const at = Number(index);
         const path = [from, ...link.points, to];
         const mid = { x: (path[at]!.x + path[at + 1]!.x) / 2, y: (path[at]!.y + path[at + 1]!.y) / 2 };
@@ -191,11 +205,16 @@ export function moveItem(map: MapData, ref: DragRef, dx: number, dy: number): Ma
   }
 }
 
-function updateLink(map: MapData, linkId: string, change: (link: MapLink, from: MapNode, to: MapNode) => Partial<MapLink>): MapData {
+/** `to` is null for an external uplink. */
+function updateLink(
+  map: MapData,
+  linkId: string,
+  change: (link: MapLink, from: MapNode, to: MapNode | null) => Partial<MapLink>,
+): MapData {
   const link = map.links.find((l) => l.id === linkId);
   const from = map.nodes.find((n) => n.id === link?.fromNodeId);
-  const to = map.nodes.find((n) => n.id === link?.toNodeId);
-  if (!link || !from || !to) return map;
+  const to = link?.toNodeId === null ? null : map.nodes.find((n) => n.id === link?.toNodeId);
+  if (!link || !from || to === undefined) return map;
   return patchItem(map, 'links', linkId, change(link, from, to));
 }
 
@@ -211,7 +230,7 @@ export function removeLinkPoint(map: MapData, pointId: string): MapData {
 /** Changes the shape of a link; a polyline starts with one vertex in the middle and rounded corners. */
 export function changeLinkShape(map: MapData, linkId: string, shape: MapLink['shape']): MapData {
   return updateLink(map, linkId, (link, from, to) => {
-    if (shape === link.shape) return {};
+    if (shape === link.shape || !to) return {};
     switch (shape) {
       case 'arc':
         return { shape, points: [], curvature: link.curvature || 0.15 };
@@ -255,7 +274,7 @@ function moveNode(map: MapData, nodeId: string, dx: number, dy: number): MapData
     nodes: map.nodes.map((n) => (moved.has(n.id) ? { ...n, ...shift(n, 1) } : n)),
     links: map.links.map((link) => {
       const fromMoved = moved.has(link.fromNodeId);
-      const toMoved = moved.has(link.toNodeId);
+      const toMoved = link.toNodeId !== null && moved.has(link.toNodeId);
       if (!fromMoved && !toMoved) return link;
       const remote = isRemote(map, link);
       // Bend points follow the end they are closer to, so curves keep their shape;

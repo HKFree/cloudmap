@@ -1,4 +1,5 @@
 import type { MapData } from './index';
+import { linkNodeIds } from './links';
 
 /** The central site every part of the network has to reach; it cannot be deleted. */
 export const CORE_NODE_ID = '4-pmv-igw';
@@ -15,7 +16,7 @@ type TopologyInput = Pick<MapData, 'nodeTypes' | 'nodes' | 'links'>;
 
 /** Ids of nodes that have at least one link. */
 export function linkedNodeIds(map: Pick<MapData, 'links'>): Set<string> {
-  return new Set(map.links.flatMap((l) => [l.fromNodeId, l.toNodeId]));
+  return new Set(map.links.flatMap(linkNodeIds));
 }
 
 /**
@@ -29,13 +30,15 @@ export function checkTopology(map: TopologyInput, previouslyLinked: ReadonlySet<
 
   const neighbours = new Map<string, string[]>();
   const connect = (a: string, b: string) => neighbours.set(a, [...(neighbours.get(a) ?? []), b]);
+  // External uplinks lead out of the map, so they connect nothing within it.
   for (const link of map.links) {
+    if (link.toNodeId === null) continue;
     connect(link.fromNodeId, link.toNodeId);
     connect(link.toNodeId, link.fromNodeId);
   }
 
   const isLooseEnd = (id: string) => pointNodes.has(id) && (neighbours.get(id)?.length ?? 0) <= 1;
-  const looseLinks = map.links.filter((l) => isLooseEnd(l.fromNodeId) || isLooseEnd(l.toNodeId)).map((l) => l.id);
+  const looseLinks = map.links.filter((l) => linkNodeIds(l).some(isLooseEnd)).map((l) => l.id);
 
   const coreMissing = !map.nodes.some((n) => n.id === CORE_NODE_ID);
   if (coreMissing) return { looseLinks, unreachableNodes: [], coreMissing };
@@ -49,8 +52,9 @@ export function checkTopology(map: TopologyInput, previouslyLinked: ReadonlySet<
       queue.push(next);
     }
   }
+  const linked = linkedNodeIds(map);
   const unreachableNodes = map.nodes
-    .filter((n) => !pointNodes.has(n.id) && (neighbours.has(n.id) || previouslyLinked.has(n.id)) && !reached.has(n.id))
+    .filter((n) => !pointNodes.has(n.id) && (linked.has(n.id) || previouslyLinked.has(n.id)) && !reached.has(n.id))
     .map((n) => n.id);
 
   return { looseLinks, unreachableNodes, coreMissing };

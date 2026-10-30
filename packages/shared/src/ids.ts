@@ -66,8 +66,8 @@ export function assignReadableIds<T extends MapContent>(map: T): { map: T; renam
     (n) => slugify(n.label) || (unnamedBase.get(n.typeId) ?? 'uzel'),
   );
   const links = rename(
-    map.links.map((l) => ({ ...l, typeId: ref(l.typeId), fromNodeId: ref(l.fromNodeId), toNodeId: ref(l.toNodeId) })),
-    (l) => `${l.fromNodeId}--${l.toNodeId}`,
+    map.links.map((l) => ({ ...l, typeId: ref(l.typeId), fromNodeId: ref(l.fromNodeId), toNodeId: l.toNodeId && ref(l.toNodeId) })),
+    (l) => `${l.fromNodeId}--${l.toNodeId ?? (slugify(l.peer) || 'mimo')}`,
   );
   const labels = rename(map.labels, (l) => ['popisek', slugify(l.text)].filter(Boolean).join('-'));
 

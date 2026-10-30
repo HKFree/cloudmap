@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { CORE_NODE_ID, linkShapes, type LinkShape, type MapData, type MapLabel, type MapLink, type MapNode } from '@cloudmap/shared';
-import { areaMembers, changeLinkShape, DEFAULT_CORNER_RADIUS, isArea, patchItem, type ItemRef } from '../editor/operations';
+import { areaMembers, changeLinkShape, DEFAULT_CORNER_RADIUS, isArea, isRemote, patchItem, peerName, type ItemRef } from '../editor/operations';
 import { textBlockWidth } from '../map/MultilineText';
 import type { Editor } from '../editor/useEditor';
 
@@ -111,9 +111,13 @@ function NodeDetail({ data, node, editor, onSelect, onDelete, onClose }: Props &
           return (
             <li key={link.id}>
               <span className="swatch" style={{ background: linkType?.color }} title={linkType?.name} />
-              <button type="button" onClick={() => onSelect({ kind: 'node', id: otherId }, true)}>
-                {oneLine(nodes.get(otherId)?.label || '(bez názvu)')}
-              </button>
+              {otherId === null ? (
+                <span>↗ {peerName(link)}</span>
+              ) : (
+                <button type="button" onClick={() => onSelect({ kind: 'node', id: otherId }, true)}>
+                  {oneLine(nodes.get(otherId)?.label || '(bez názvu)')}
+                </button>
+              )}
               <button type="button" className="muted" onClick={() => onSelect({ kind: 'link', id: link.id }, true)}>
                 {[linkType?.name, link.capacity].filter(Boolean).join(', ')}
               </button>
@@ -134,7 +138,11 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
   const changeShape = (shape: LinkShape) => editor?.apply((m) => changeLinkShape(m, link.id, shape));
   // Bezier curves come only from the import; new ones cannot be drawn yet.
   const availableShapes = linkShapes.filter((s) => s !== 'bezier' || s === link.shape);
-  const remote = linkType?.remote ?? false;
+  const remote = isRemote(data, link);
+  const { toNodeId } = link;
+  const external = toNodeId === null;
+  // Only connectivity outside hkfree may lead out of the map.
+  const typeOptions = external ? data.linkTypes.filter((t) => t.remote) : data.linkTypes;
 
   return (
     <section className="panel detail">
@@ -143,17 +151,23 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
         <button type="button" onClick={() => onSelect({ kind: 'node', id: link.fromNodeId }, true)}>
           {nodeName(link.fromNodeId)}
         </button>
-        {' ↔ '}
-        <button type="button" onClick={() => onSelect({ kind: 'node', id: link.toNodeId }, true)}>
-          {nodeName(link.toNodeId)}
-        </button>
+        {toNodeId === null ? (
+          ` ↗ ${peerName(link)}`
+        ) : (
+          <>
+            {' ↔ '}
+            <button type="button" onClick={() => onSelect({ kind: 'node', id: toNodeId }, true)}>
+              {nodeName(toNodeId)}
+            </button>
+          </>
+        )}
       </p>
 
       {editor ? (
         <div className="form">
           <Field label="Typ spoje">
             <select value={link.typeId} onChange={(e) => edit({ typeId: e.target.value }, 'type')}>
-              {data.linkTypes.map((t) => (
+              {typeOptions.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
@@ -163,7 +177,14 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
           <Field label="Kapacita">
             <input value={link.capacity} placeholder="např. 1Gbps" onChange={(e) => edit({ capacity: e.target.value }, 'capacity')} />
           </Field>
-          {remote ? (
+          {external ? (
+            <>
+              <Field label="Protistrana">
+                <input value={link.peer} placeholder="např. CETIN" onChange={(e) => edit({ peer: e.target.value }, 'peer')} />
+              </Field>
+              <p className="hint">Spoj vede mimo mapu, kreslí se jako jeden konec se šipkou. Konec lze v mapě přetáhnout.</p>
+            </>
+          ) : remote ? (
             <p className="hint">
               Vzdálený spoj se kreslí jen jako dva konce u svých uzlů. Konce lze v mapě přetáhnout, dvojklikem se vrátí na
               výchozí místo.
@@ -220,6 +241,12 @@ function LinkDetail({ data, link, editor, onSelect, onDelete, onClose }: Props &
           </dd>
           <dt>Kapacita</dt>
           <dd>{link.capacity || '–'}</dd>
+          {external && (
+            <>
+              <dt>Protistrana</dt>
+              <dd>{link.peer || '–'}</dd>
+            </>
+          )}
           {link.note && (
             <>
               <dt>Poznámka</dt>
