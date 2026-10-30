@@ -113,16 +113,49 @@ function arcPath(from: Point, to: Point, curvature: number): string {
   return `M${fmt(from)}A${r.toFixed(1)} ${r.toFixed(1)} 0 ${largeArc} ${sweep} ${fmt(to)}`;
 }
 
-/** Where to put a link label when the import did not provide a position. */
+/** Point halfway along the drawn link, where its label sits when not moved by hand. */
 export function linkMidpoint(link: MapLink, from: Point, to: Point): Point {
   const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
-  if (link.shape === 'arc') {
-    const chord = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-    const offset = link.curvature * chord;
-    return { x: mid.x + ((to.y - from.y) / chord) * offset, y: mid.y - ((to.x - from.x) / chord) * offset };
+  switch (link.shape) {
+    case 'arc': {
+      const chord = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+      const offset = link.curvature * chord;
+      return { x: mid.x + ((to.y - from.y) / chord) * offset, y: mid.y - ((to.x - from.x) / chord) * offset };
+    }
+    case 'bezier':
+      return halfwayAlong(bezierSamples([from, ...link.points, to]));
+    case 'polyline':
+      return halfwayAlong([from, ...link.points, to]);
+    default:
+      return mid;
   }
-  if (link.points.length) return link.points[Math.floor(link.points.length / 2)]!;
-  return mid;
+}
+
+const BEZIER_STEPS = 24;
+
+/** Points along the cubic segments drawn by `linkPath`, dense enough to measure length. */
+function bezierSamples(pts: Point[]): Point[] {
+  const samples = [pts[0]!];
+  for (let i = 1; i + 2 < pts.length; i += 3) {
+    const [p0, p1, p2, p3] = [pts[i - 1]!, pts[i]!, pts[i + 1]!, pts[i + 2]!];
+    for (let step = 1; step <= BEZIER_STEPS; step++) {
+      const t = step / BEZIER_STEPS;
+      const u = 1 - t;
+      const [a, b, c, d] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+      samples.push({ x: a * p0.x + b * p1.x + c * p2.x + d * p3.x, y: a * p0.y + b * p1.y + c * p2.y + d * p3.y });
+    }
+  }
+  return samples;
+}
+
+function halfwayAlong(points: Point[]): Point {
+  const lengths = points.slice(1).map((p, i) => distance(points[i]!, p));
+  let remaining = lengths.reduce((sum, l) => sum + l, 0) / 2;
+  for (let i = 0; i < lengths.length; i++) {
+    if (remaining <= lengths[i]!) return towards(points[i]!, points[i + 1]!, remaining);
+    remaining -= lengths[i]!;
+  }
+  return points[points.length - 1]!;
 }
 
 export function linkLabelPosition(link: MapLink, from: Point, to: Point): Point {
