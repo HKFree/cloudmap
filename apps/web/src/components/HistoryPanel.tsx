@@ -26,18 +26,26 @@ interface Props {
   viewedRevision: number | null;
   latestRevision: number | null;
   onView: (revision: number | null) => void;
+  /** Reports the newest saved revision, which may be newer than the loaded map. */
+  onNewestRevision: (id: number) => void;
   onClose: () => void;
 }
 
-export function HistoryPanel({ viewedRevision, latestRevision, onView, onClose }: Props) {
+export function HistoryPanel({ viewedRevision, latestRevision, onView, onNewestRevision, onClose }: Props) {
   const [revisions, setRevisions] = useState<RevisionSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRevisions()
-      .then(setRevisions)
+      .then((list) => {
+        setRevisions(list);
+        if (list[0]) onNewestRevision(list[0].id);
+      })
       .catch((e: Error) => setError(e.message));
   }, [latestRevision]);
+
+  // Revisions are listed newest first, so the first one is the current map.
+  const newestId = revisions?.[0]?.id ?? latestRevision;
 
   return (
     <section className="panel history">
@@ -51,7 +59,7 @@ export function HistoryPanel({ viewedRevision, latestRevision, onView, onClose }
       {!revisions && !error && <p className="muted">Načítám…</p>}
       <ol className="revision-list">
         {revisions?.map((revision) => {
-          const isLatest = revision.id === latestRevision;
+          const isLatest = revision.id === newestId;
           const isViewed = revision.id === viewedRevision;
           return (
             <li key={revision.id} className={isViewed ? 'active' : undefined}>

@@ -325,6 +325,7 @@ export function App() {
       if (e.key === 'Escape') {
         if (tool !== 'select' || pendingFrom) changeTool('select');
         else if (selection && !typing) select(null);
+        else if (revision && !editing && !typing) leaveRevision();
         return;
       }
       if (typing) return;
@@ -362,6 +363,13 @@ export function App() {
 
   const legendSvgHeight = shown ? legendHeight(shown.linkTypes, shown.nodeTypes, false) : 0;
 
+  const leaveRevision = () => navigate({ selection, revision: null });
+
+  // Somebody else may have saved since the map was loaded; the history shows it, so catch up.
+  const onNewestRevision = (id: number) => {
+    if (!editing && id > (current?.revision?.id ?? 0)) reload().catch((e: Error) => setError(e.message));
+  };
+
   const isLatestViewed = revision !== null && revision === current?.revision?.id;
 
   const toggleLinkType = (id: string) =>
@@ -395,6 +403,9 @@ export function App() {
 
       {!editing && revision && (
         <div className="banner">
+          <button type="button" className="primary" onClick={leaveRevision} title="Zpět na aktuální mapu (Esc)">
+            {isLatestViewed ? 'Skrýt změny' : '← Zpět na aktuální mapu'} <kbd>Esc</kbd>
+          </button>
           {viewed?.revision ? (
             <>
               {isLatestViewed ? 'Aktuální verze mapy' : 'Prohlížíš starší verzi mapy'}: revize #{viewed.revision.id} z{' '}
@@ -404,15 +415,11 @@ export function App() {
           ) : (
             <>Načítám revizi #{revision}…</>
           )}
-          <span className="spacer" />
           {!isLatestViewed && (
             <button type="button" onClick={restore} disabled={!viewed}>
               Obnovit tuto verzi
             </button>
           )}
-          <button type="button" onClick={() => navigate({ selection, revision: null })}>
-            {isLatestViewed ? 'Skrýt změny' : 'Zobrazit aktuální'}
-          </button>
         </div>
       )}
 
@@ -474,6 +481,7 @@ export function App() {
                 changes={revisionChanges}
                 dimUnchanged={dimUnchanged}
                 onDimUnchangedChange={setDimUnchanged}
+                onClose={leaveRevision}
                 onShow={(change) => {
                   const item = itemRefOf(change);
                   if (!item) return;
@@ -487,6 +495,7 @@ export function App() {
               <HistoryPanel
                 viewedRevision={revision}
                 latestRevision={current?.revision?.id ?? null}
+                onNewestRevision={onNewestRevision}
                 onView={(id) => navigate({ selection, revision: id })}
                 onClose={() => setShowHistory(false)}
               />
@@ -514,7 +523,7 @@ export function App() {
             <AppInfo data={shown} />
           </aside>
         )}
-        <main className="main">
+        <main className={['main', !editing && revision && !isLatestViewed && 'old-revision'].filter(Boolean).join(' ')}>
           {error && <div className="message error">{error}</div>}
           {!shown && !error && <div className="message">Načítám mapu…</div>}
           {shown && shown.nodes.length === 0 && !editing && (

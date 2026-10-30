@@ -403,10 +403,24 @@ button.danger {
 .banner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   padding: 6px 16px;
   background: #ddf4ff;
   border-bottom: 1px solid #54aeff;
+}
+
+.banner kbd {
+  margin-left: 4px;
+  background: #ffffff33;
+  color: inherit;
+  border-color: #ffffff80;
+}
+
+/* A frame around the map makes it obvious that it is not the current state. */
+.main.old-revision {
+  outline: 4px solid #54aeff;
+  outline-offset: -4px;
 }
 
 .map-canvas [data-kind] {

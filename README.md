@@ -77,8 +77,8 @@ curl -H "Authorization: Bearer <klíč>" https://cloudmap.hkfree.org/api/v1/map
 Verze se řídí `version` v kořenovém `package.json` (semver, začínáme na 0.1.0)
 a zobrazuje se v patičce aplikace.
 
-1. zvýšit verzi: `npm version 0.4.2 --no-git-tag-version` a commit
-2. `git tag v0.4.2 && git push origin v0.4.2`
-3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.4.2` (+ `:0.4`, `:latest`) a GitHub release
+1. zvýšit verzi: `npm version 0.4.3 --no-git-tag-version` a commit
+2. `git tag v0.4.3 && git push origin v0.4.3`
+3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.4.3` (+ `:0.4`, `:latest`) a GitHub release
 
 Každý push do `main` vydá image `:edge` pro testování.
