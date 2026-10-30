@@ -54,6 +54,14 @@ describe('moveItem', () => {
     expect([...areaMembers(start, start.nodes[1]!)]).toEqual(['ap']);
   });
 
+  it('moves an external uplink stub with its node and drags its end', () => {
+    const uplink = { ...createLink('a', null, 'leased', { x: 0, y: -100 }), id: 'up' };
+    const start = map([node('a', 0, 0)], [uplink]);
+    expect(moveItem(start, { kind: 'node', id: 'a' }, 10, 10).links[0]!.points).toEqual([{ x: 10, y: -90 }]);
+    expect(moveItem(start, { kind: 'linkPoint', id: 'up:0' }, 50, 0).links[0]!.points).toEqual([{ x: 50, y: -100 }]);
+    expect(deleteItem(start, { kind: 'node', id: 'a' }).links).toEqual([]);
+  });
+
   it('keeps each stub of a remote link with its own node', () => {
     const points = [{ x: 100, y: 0 }, { x: 900, y: 0 }];
     const start = map([node('a', 0, 0), node('b', 1000, 0)], [link('l', 'a', 'b', { typeId: 'leased', points })]);

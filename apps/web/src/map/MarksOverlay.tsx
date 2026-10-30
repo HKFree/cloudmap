@@ -1,5 +1,6 @@
 import type { MapData, MapLink, MapNode } from '@cloudmap/shared';
-import { cloudPath, linkPath, stubEnds } from './geometry';
+import { isRemote } from '../editor/operations';
+import { cloudPath, linkPath, remoteStubs } from './geometry';
 import { MultilineText } from './MultilineText';
 
 /**
@@ -114,11 +115,14 @@ function LinkShape({
   width: number;
 }) {
   const from = nodes.get(link.fromNodeId);
-  const to = nodes.get(link.toNodeId);
-  if (!from || !to) return null;
-  if (map.linkTypes.some((t) => t.id === link.typeId && t.remote)) {
-    const [a, b] = stubEnds(link, from, to);
-    return <path d={`M${from.x} ${from.y}L${a.x} ${a.y}M${to.x} ${to.y}L${b.x} ${b.y}`} stroke={stroke} strokeWidth={width} />;
+  const to = link.toNodeId === null ? null : nodes.get(link.toNodeId);
+  if (!from || to === undefined) return null;
+  if (isRemote(map, link)) {
+    const d = remoteStubs(link, from, to)
+      .map(({ start, end }) => `M${start.x} ${start.y}L${end.x} ${end.y}`)
+      .join('');
+    return <path d={d} stroke={stroke} strokeWidth={width} />;
   }
+  if (!to) return null;
   return <path d={linkPath(link, from, to)} stroke={stroke} strokeWidth={width} />;
 }

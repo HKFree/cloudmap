@@ -8,7 +8,7 @@ const nodeTypes: MapData['nodeTypes'] = [
 const node = (id: string, typeId = 'ap') => ({ id, typeId, label: id, x: 0, y: 0, width: 10, height: 10, fontSize: 12, labelDx: 0, labelDy: 0, note: '' });
 const link = (from: string, to: string) => ({
   id: `${from}--${to}`, typeId: 't', fromNodeId: from, toNodeId: to, shape: 'straight' as const, curvature: 0,
-  points: [], cornerRadius: 0, capacity: '', labelX: null, labelY: null, note: '',
+  points: [], cornerRadius: 0, capacity: '', peer: '', labelX: null, labelY: null, note: '',
 });
 
 describe('checkTopology', () => {
@@ -33,6 +33,17 @@ describe('checkTopology', () => {
     const after = { ...before, links: [] };
     expect(checkTopology(after).unreachableNodes).toEqual([]);
     expect(checkTopology(after, linkedNodeIds(before)).unreachableNodes).toEqual(['a']);
+  });
+
+  it('treats an external uplink as neither loose nor a path to the core', () => {
+    const uplink = (from: string) => ({ ...link(from, 'x'), id: `${from}--mimo`, toNodeId: null });
+    const problems = checkTopology({
+      nodeTypes,
+      nodes: [node(CORE_NODE_ID), node('a'), node('island'), node('p1', 'bod')],
+      links: [uplink(CORE_NODE_ID), link(CORE_NODE_ID, 'a'), uplink('island'), uplink('p1')],
+    });
+    expect(problems.looseLinks).toEqual(['p1--mimo']);
+    expect(problems.unreachableNodes).toEqual(['island']);
   });
 
   it('reports a missing core node', () => {

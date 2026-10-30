@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { assignReadableIds, checkTopology, CORE_NODE_ID, diffMaps, hasTopologyProblems, linkedNodeIds, type MapData, type Point } from '@cloudmap/shared';
+import {
+  assignReadableIds,
+  checkTopology,
+  CORE_NODE_ID,
+  diffMaps,
+  hasTopologyProblems,
+  linkedNodeIds,
+  linkNodeIds,
+  type MapData,
+  type Point,
+} from '@cloudmap/shared';
 import { fetchMap, restoreRevision, saveChanges } from './api';
 import { DetailPanel } from './components/DetailPanel';
 import { AppInfo } from './components/AppInfo';
@@ -32,10 +42,9 @@ function itemBounds(map: MapData, item: ItemRef): Bounds | null {
     return label ? around(label.x, label.y, 300) : null;
   }
   const link = map.links.find((l) => l.id === item.id);
-  const from = map.nodes.find((n) => n.id === link?.fromNodeId);
-  const to = map.nodes.find((n) => n.id === link?.toNodeId);
-  if (!link || !from || !to) return null;
-  const points = [from, to, ...link.points];
+  const ends = map.nodes.filter((n) => link && linkNodeIds(link).includes(n.id));
+  if (!link || ends.length === 0) return null;
+  const points = [...ends, ...link.points];
   const padding = 150;
   return {
     minX: Math.min(...points.map((p) => p.x)) - padding,
@@ -139,8 +148,7 @@ export function App() {
     const ghostLinks = new Set(marks.ghosts?.links);
     for (const link of [...(shown?.links ?? []), ...(marks.ghosts?.map.links ?? [])]) {
       if (!links.has(link.id) && !ghostLinks.has(link.id)) continue;
-      nodes.add(link.fromNodeId);
-      nodes.add(link.toNodeId);
+      for (const id of linkNodeIds(link)) nodes.add(id);
     }
     if (selection?.kind === 'node') nodes.add(selection.id);
     if (selection?.kind === 'link') links.add(selection.id);
@@ -277,6 +285,11 @@ export function App() {
       editor.apply((m) => upsertItem(m, 'nodes', node));
       changeTool('select');
       select({ kind: 'node', id: node.id });
+    } else if (editing && tool === 'addLink' && pendingFrom && shown!.linkTypes.some((t) => t.id === newLinkTypeId && t.remote)) {
+      const link = createLink(pendingFrom, null, newLinkTypeId, at);
+      editor.apply((m) => upsertItem(m, 'links', link));
+      changeTool('select');
+      select({ kind: 'link', id: link.id });
     } else if (editing && tool === 'addLabel') {
       const label = createLabel(at);
       editor.apply((m) => upsertItem(m, 'labels', label));

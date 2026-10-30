@@ -49,6 +49,10 @@ Typ spoje označený jako **vzdálený spoj** (např. „datová konektivita“,
 hkfree) se nekreslí přes celou mapu, ale jen jako krátké konce u obou uzlů s názvem protější
 strany. Kliknutím na kterýkoli konec se vybere celý spoj a zvýrazní se obě strany.
 
+Vzdálený spoj může vést i **mimo mapu**, např. uplink k poskytovateli: v editoru „+ Spoj“
+s vybraným vzdáleným typem klikni na uzel a pak do prázdna. Kreslí se jako jeden konec se šipkou
+a názvem protistrany. V API má takový spoj `toNodeId: null` a protistranu v `peer`.
+
 Vybraný uzel, spoj či zobrazená revize jsou v adrese za `#` (např. `#uzel=183-natura`,
 `#spoj=183-natura--4-pmv-igw`, `#revize=3`), odkaz lze poslat dál a funguje tlačítko Zpět.
 Id vznikne z názvu při prvním uložení a dál se nemění (ani při přejmenování), aby odkazy
@@ -104,8 +108,8 @@ curl -H "Authorization: Bearer <klíč>" https://cloudmap.hkfree.org/api/v1/map
 Verze se řídí `version` v kořenovém `package.json` (semver, začínáme na 0.1.0)
 a zobrazuje se v patičce aplikace.
 
-1. zvýšit verzi: `npm version 0.4.0 --no-git-tag-version` a commit
-2. `git tag v0.4.0 && git push origin v0.4.0`
-3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.4.0` (+ `:0.4`, `:latest`) a GitHub release
+1. zvýšit verzi: `npm version 0.4.1 --no-git-tag-version` a commit
+2. `git tag v0.4.1 && git push origin v0.4.1`
+3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.4.1` (+ `:0.4`, `:latest`) a GitHub release
 
 Každý push do `main` vydá image `:edge` pro testování.

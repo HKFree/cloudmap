@@ -47,11 +47,13 @@ export interface LinkTable {
   id: string;
   type_id: string;
   from_node_id: string;
+  /** Equal to from_node_id for an external uplink, whose far end is off the map. */
   to_node_id: string;
   shape: string;
   curvature: number;
   corner_radius: number;
   capacity: string;
+  peer: string;
   label_x: number | null;
   label_y: number | null;
   note: string;

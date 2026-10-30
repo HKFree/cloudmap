@@ -137,9 +137,22 @@ const editorColumns: Migration = {
   },
 };
 
+/** Provider name of external uplinks, which lead out of the map (stored with to_node_id = from_node_id). */
+const linkPeer: Migration = {
+  async up(db: Kysely<any>) {
+    for (const table of ['link', 'link_history']) {
+      await db.schema.alterTable(table).addColumn('peer', 'varchar(255)', (c) => c.notNull().defaultTo('')).execute();
+    }
+  },
+  async down(db: Kysely<any>) {
+    for (const table of ['link', 'link_history']) await db.schema.alterTable(table).dropColumn('peer').execute();
+  },
+};
+
 const migrations: Record<string, Migration> = {
   '0001_initial': initial,
   '0002_editor_columns': editorColumns,
+  '0003_link_peer': linkPeer,
 };
 
 export async function migrateToLatest(db: Kysely<any>): Promise<void> {

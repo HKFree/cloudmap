@@ -74,6 +74,17 @@ describe('editing API', () => {
     expect((await getMap()).linkTypes.map((t) => t.name)).toContain('18GHz');
   });
 
+  it('saves an external uplink only with a remote link type', async () => {
+    const map = await getMap();
+    const uplink = { ...map.links[0]!, id: 'uplink', toNodeId: null, peer: 'CETIN', points: [{ x: 5, y: 6 }] };
+    expect((await save({ baseRevisionId: 1, upsert: { links: [uplink] } })).statusCode).toBe(422);
+
+    const remoteType = { ...map.linkTypes[0]!, id: 'konektivita', name: 'konektivita', remote: true };
+    const response = await save({ baseRevisionId: 1, upsert: { linkTypes: [remoteType], links: [{ ...uplink, typeId: remoteType.id }] } });
+    expect(response.statusCode).toBe(201);
+    expect((await getMap()).links.find((l) => l.id === 'uplink')).toMatchObject({ toNodeId: null, peer: 'CETIN', points: [{ x: 5, y: 6 }] });
+  });
+
   it('restores an older revision and summarises changes', async () => {
     const map = await getMap();
     const link = map.links[0]!;

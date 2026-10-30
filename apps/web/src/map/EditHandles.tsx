@@ -1,6 +1,6 @@
 import type { MapData, Point } from '@cloudmap/shared';
-import type { Corner, ItemRef } from '../editor/operations';
-import { stubEnds } from './geometry';
+import { isRemote, type Corner, type ItemRef } from '../editor/operations';
+import { remoteStubs } from './geometry';
 
 interface Props {
   data: MapData;
@@ -56,14 +56,13 @@ export function EditHandles({ data, selection, zoom }: Props) {
   if (selection?.kind === 'link') {
     const link = data.links.find((l) => l.id === selection.id);
     const from = data.nodes.find((n) => n.id === link?.fromNodeId);
-    const to = data.nodes.find((n) => n.id === link?.toNodeId);
-    if (!link || !from || !to) return null;
-    const remote = data.linkTypes.some((t) => t.id === link.typeId && t.remote);
+    const to = link?.toNodeId === null ? null : data.nodes.find((n) => n.id === link?.toNodeId);
+    if (!link || !from || to === undefined) return null;
 
-    if (remote) {
-      return <g>{stubEnds(link, from, to).map((p, i) => <PointHandle key={i} id={`${link.id}:${i}`} at={p} size={size} />)}</g>;
+    if (isRemote(data, link)) {
+      return <g>{remoteStubs(link, from, to).map((s, i) => <PointHandle key={i} id={`${link.id}:${i}`} at={s.end} size={size} />)}</g>;
     }
-    if (link.shape !== 'polyline') return null;
+    if (!to || link.shape !== 'polyline') return null;
     const path = [from, ...link.points, to];
     return (
       <g>

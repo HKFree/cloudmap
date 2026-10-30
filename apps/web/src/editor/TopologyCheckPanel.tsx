@@ -1,5 +1,5 @@
 import { hasTopologyProblems, type MapData, type TopologyProblems } from '@cloudmap/shared';
-import type { ItemRef } from './operations';
+import { linkTitle, type ItemRef } from './operations';
 
 interface Props {
   data: MapData;
@@ -19,7 +19,7 @@ export function TopologyCheckPanel({ data, problems, previous, saving, onShow, o
   const nodeName = (id: string) => oneLine(data.nodes.find((n) => n.id === id)?.label ?? '') || '(bod)';
   const linkName = (id: string) => {
     const link = data.links.find((l) => l.id === id);
-    return link ? `${nodeName(link.fromNodeId)} ↔ ${nodeName(link.toNodeId)}` : id;
+    return link ? linkTitle(link, nodeName) : id;
   };
   const wasLoose = new Set(previous.looseLinks);
   const wasUnreachable = new Set(previous.unreachableNodes);

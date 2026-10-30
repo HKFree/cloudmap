@@ -1,5 +1,5 @@
 import { diffMaps, type MapCollection, type MapData } from '@cloudmap/shared';
-import type { ItemKind, ItemRef } from '../editor/operations';
+import { linkTitle, type ItemKind, type ItemRef } from '../editor/operations';
 
 export type ChangeKind = 'added' | 'changed' | 'deleted';
 
@@ -19,7 +19,7 @@ const fieldNames: Record<MapCollection, Record<string, string>> = {
   nodes: { label: 'název', typeId: 'typ', x: 'poloha', y: 'poloha', width: 'velikost', height: 'velikost', fontSize: 'písmo', labelDx: 'poloha názvu', labelDy: 'poloha názvu', note: 'poznámka' },
   links: {
     typeId: 'typ', fromNodeId: 'konec', toNodeId: 'konec', shape: 'tvar', curvature: 'prohnutí', points: 'trasa',
-    cornerRadius: 'zaoblení', capacity: 'kapacita', labelX: 'poloha popisku', labelY: 'poloha popisku', note: 'poznámka',
+    cornerRadius: 'zaoblení', capacity: 'kapacita', peer: 'protistrana', labelX: 'poloha popisku', labelY: 'poloha popisku', note: 'poznámka',
   },
   labels: { text: 'text', x: 'poloha', y: 'poloha', fontSize: 'písmo', bold: 'tučné', color: 'barva', align: 'zarovnání' },
   linkTypes: { name: 'název', color: 'barva', width: 'tloušťka', dash: 'styl čáry', description: 'popis', sortOrder: 'pořadí', remote: 'vzdálený spoj' },
@@ -89,7 +89,7 @@ function itemTitle(map: MapData, collection: MapCollection, id: string): string 
       const link = map.links.find((l) => l.id === id);
       if (!link) return undefined;
       const name = (nodeId: string) => oneLine(map.nodes.find((n) => n.id === nodeId)?.label ?? '') || '(bod)';
-      return `${name(link.fromNodeId)} ↔ ${name(link.toNodeId)}`;
+      return linkTitle(link, name);
     }
     case 'labels': {
       const label = map.labels.find((l) => l.id === id);
