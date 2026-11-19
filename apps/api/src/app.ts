@@ -40,7 +40,7 @@ export async function buildApp({ db, version, auth, staticDir, logger = false }:
     ...(existsSync(bundledSwaggerUi) ? { baseDir: bundledSwaggerUi } : {}),
   });
 
-  await registerAuth(app, auth);
+  await registerAuth(app, auth, db);
 
   app.get('/healthz', { schema: { hide: true } }, async () => ({ ok: true }));
   await app.register(metaRoutes({ version }), { prefix: '/api/v1' });

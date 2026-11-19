@@ -149,10 +149,29 @@ const linkPeer: Migration = {
   },
 };
 
+/** Server-side login sessions, so logging out or an admin can revoke them. */
+const sessions: Migration = {
+  async up(db: Kysely<any>) {
+    await db.schema
+      .createTable('session')
+      .addColumn('id', 'varchar(64)', (c) => c.primaryKey())
+      .addColumn('user_id', 'varchar(255)', (c) => c.notNull())
+      .addColumn('user_name', 'varchar(255)', (c) => c.notNull())
+      .addColumn('created_at', 'varchar(32)', (c) => c.notNull())
+      .addColumn('last_seen_at', 'varchar(32)', (c) => c.notNull())
+      .execute();
+    await db.schema.createIndex('session_user_idx').on('session').column('user_id').execute();
+  },
+  async down(db: Kysely<any>) {
+    await db.schema.dropTable('session').execute();
+  },
+};
+
 const migrations: Record<string, Migration> = {
   '0001_initial': initial,
   '0002_editor_columns': editorColumns,
   '0003_link_peer': linkPeer,
+  '0004_sessions': sessions,
 };
 
 export async function migrateToLatest(db: Kysely<any>): Promise<void> {

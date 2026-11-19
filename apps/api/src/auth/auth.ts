@@ -4,8 +4,10 @@ import * as oidc from 'openid-client';
 import { z } from 'zod';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { currentUserSchema, type User } from '@cloudmap/shared';
+import type { Db } from '../db/connection';
 import { findApiKey, type ApiKey } from './apiKeys';
 import { createSealer } from './seal';
+import { createSession, deleteExpiredSessions, deleteSession, findSession, SESSION_IDLE_DAYS } from './sessions';
 
 export type AuthConfig =
   | { devMode: true; apiKeys: ApiKey[] }
@@ -36,13 +38,6 @@ export function requireUser(request: FastifyRequest): User {
 
 const SESSION_COOKIE = 'cloudmap_session';
 const LOGIN_COOKIE = 'cloudmap_login';
-const SESSION_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-interface Session {
-  user: User;
-  issuedAt: number;
-}
 
 interface PendingLogin {
   codeVerifier: string;
@@ -55,7 +50,7 @@ interface PendingLogin {
  * a signed-in user: browsers sign in through the hkfree Keycloak (OIDC code flow with PKCE),
  * scripts send `Authorization: Bearer <api key>`. With `devMode` everybody is the user "dev".
  */
-export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfig) {
+export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfig, db: Db) {
   const app = appInstance.withTypeProvider<ZodTypeProvider>();
   await app.register(fastifyCookie);
   app.decorateRequest('user', null);
@@ -64,19 +59,15 @@ export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfi
   const secureCookies = !auth.devMode && auth.publicUrl.startsWith('https://');
   const cookieOptions = { httpOnly: true, sameSite: 'lax', secure: secureCookies, path: '/' } as const;
 
-  const startSession = (reply: FastifyReply, user: User) =>
-    reply.setCookie(SESSION_COOKIE, sealer!.seal({ user, issuedAt: Date.now() } satisfies Session), {
-      ...cookieOptions,
-      maxAge: SESSION_DAYS * DAY_MS / 1000,
-    });
+  const setSessionCookie = (reply: FastifyReply, token: string) =>
+    reply.setCookie(SESSION_COOKIE, token, { ...cookieOptions, maxAge: SESSION_IDLE_DAYS * 24 * 60 * 60 });
 
-  const userFromSession = (request: FastifyRequest, reply: FastifyReply): User | null => {
-    const session = sealer!.unseal<Session>(request.cookies[SESSION_COOKIE]);
+  const userFromSession = async (request: FastifyRequest, reply: FastifyReply): Promise<User | null> => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (!token) return null;
+    const session = await findSession(db, token);
     if (!session) return null;
-    const age = Date.now() - session.issuedAt;
-    if (age > SESSION_DAYS * DAY_MS) return null;
-    // Sliding expiry: anyone using the app at least weekly stays signed in.
-    if (age > DAY_MS) startSession(reply, session.user);
+    if (session.renewed) setSessionCookie(reply, token);
     return session.user;
   };
 
@@ -88,7 +79,7 @@ export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfi
       request.user = { id: `api:${key.name}`, name: `api:${key.name}` };
       return;
     }
-    request.user = auth.devMode ? DEV_USER : userFromSession(request, reply);
+    request.user = auth.devMode ? DEV_USER : await userFromSession(request, reply);
     if (request.user) return;
 
     // The matched route pattern, not the raw URL: the router decodes `/%61pi/...` to `/api/...`.
@@ -159,11 +150,14 @@ export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfi
     }
     if (!claims) return reply.code(401).type('text/plain; charset=utf-8').send('Přihlášení se nezdařilo. Zkus to znovu: /auth/login');
 
-    startSession(reply, userFromClaims(claims));
+    await deleteExpiredSessions(db);
+    setSessionCookie(reply, await createSession(db, userFromClaims(claims)));
     return reply.redirect(pending.returnTo);
   });
 
-  app.get('/auth/logout', { schema: { hide: true } }, async (_request, reply) => {
+  app.get('/auth/logout', { schema: { hide: true } }, async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (token) await deleteSession(db, token);
     reply.clearCookie(SESSION_COOKIE, cookieOptions);
     const url = oidc.buildEndSessionUrl(await oidcConfig(), {
       client_id: auth.oidc.clientId,
