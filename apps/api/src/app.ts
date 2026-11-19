@@ -51,7 +51,7 @@ export async function buildApp({ db, version, auth, staticDir, logger = false }:
     await app.register(fastifyStatic, { root, wildcard: false });
     // Client-side routes fall back to the SPA entry point.
     app.setNotFoundHandler((request, reply) => {
-      if (request.method === 'GET' && !request.url.startsWith('/api/')) {
+      if (request.method === 'GET' && !isApiPath(request.url)) {
         return reply.sendFile('index.html', root);
       }
       return reply.code(404).send({ error: 'Nenalezeno' });
@@ -59,4 +59,12 @@ export async function buildApp({ db, version, auth, staticDir, logger = false }:
   }
 
   return app;
+}
+
+function isApiPath(url: string) {
+  try {
+    return decodeURIComponent(url.split('?')[0]!).startsWith('/api/');
+  } catch {
+    return true;
+  }
 }
