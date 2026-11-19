@@ -53,7 +53,7 @@ Upravovat může každý přihlášený. U každé revize je uložen autor ve tv
 | `PUBLIC_URL` | adresa aplikace, např. `https://cloudmap.hkfree.org` |
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | confidential klient v Keycloaku |
 | `OIDC_ISSUER` | výchozí `https://sso.hkfree.org/realms/hkfree` |
-| `SESSION_SECRET` | min. 32 znaků, šifruje cookie s přihlášením (`openssl rand -base64 48`) |
+| `SESSION_SECRET` | min. 32 znaků, šifruje cookie během přihlašování (`openssl rand -base64 48`) |
 | `API_KEYS_FILE` | soubor s API klíči, v kontejneru `/data/api-keys.json` |
 
 Bez `DEV_MODE=true` aplikace bez těchto proměnných nenastartuje.
@@ -61,7 +61,9 @@ Bez `DEV_MODE=true` aplikace bez těchto proměnných nenastartuje.
 Klient v Keycloaku: *Client authentication* zapnuto, *Standard flow*,
 *Valid redirect URIs* `https://cloudmap.hkfree.org/auth/callback`,
 *Valid post logout redirect URIs* `https://cloudmap.hkfree.org/`.
-Přihlášení vydrží 7 dní od posledního použití aplikace, odhlášení je v levém panelu dole.
+Přihlášení vydrží 7 dní od posledního použití aplikace, nejdéle však 30 dní od přihlášení.
+Odhlášení je v levém panelu dole a relaci zruší i na serveru. Relace jsou v tabulce `session`,
+všechny relace uživatele zruší `DELETE FROM session WHERE user_id = '<UserDB id>'`.
 
 Skripty se přihlašují API klíčem v hlavičce `Authorization: Bearer <klíč>`. Klíče jsou
 v JSON souboru `{"název": "klíč"}` (vzor `api-keys.example.json`, klíč min. 16 znaků),
@@ -77,8 +79,8 @@ curl -H "Authorization: Bearer <klíč>" https://cloudmap.hkfree.org/api/v1/map
 Verze se řídí `version` v kořenovém `package.json` (semver, začínáme na 0.1.0)
 a zobrazuje se v patičce aplikace.
 
-1. zvýšit verzi: `npm version 0.4.4 --no-git-tag-version` a commit
-2. `git tag v0.4.4 && git push origin v0.4.4`
-3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.4.4` (+ `:0.4`, `:latest`) a GitHub release
+1. zvýšit verzi: `npm version 0.4.5 --no-git-tag-version` a commit
+2. `git tag v0.4.5 && git push origin v0.4.5`
+3. GitHub Actions otestuje kód, vydá image `ghcr.io/hkfree/cloudmap:0.4.5` (+ `:0.4`, `:latest`) a GitHub release
 
 Každý push do `main` vydá image `:edge` pro testování.

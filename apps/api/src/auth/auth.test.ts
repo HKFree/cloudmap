@@ -1,10 +1,20 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app';
 import { openDatabase, type Db } from '../db/connection';
 import { importDia } from '../dia/import';
 import { sampleDiagram } from '../test/fixtures';
 import { requireUser, userFromClaims, type AuthConfig } from './auth';
 import { createSealer } from './seal';
+import { createSession } from './sessions';
+
+// Keeps the tests offline: logout would otherwise run OIDC discovery against the issuer.
+vi.mock('openid-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('openid-client')>()),
+  discovery: vi.fn(async () => ({})),
+  buildEndSessionUrl: vi.fn(() => new URL('https://sso.example.org/logout')),
+}));
+
+const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
 const sessionSecret = 'test-secret-that-is-long-enough-1234567890';
 const apiKeys = [{ name: 'skript', key: 'a-very-secret-api-key' }];
@@ -60,8 +70,7 @@ describe('authentication', () => {
 
   it('accepts a session cookie and records the user as author', async () => {
     await start(ssoAuth);
-    const session = createSealer(sessionSecret).seal({ user: { id: '277', name: 'Jakub' }, issuedAt: Date.now() });
-    const cookie = `cloudmap_session=${session}`;
+    const cookie = `cloudmap_session=${await createSession(db, { id: '277', name: 'Jakub' })}`;
 
     expect((await app.inject({ url: '/api/v1/me', headers: { cookie } })).json()).toEqual({
       user: { id: '277', name: 'Jakub' },
@@ -71,13 +80,40 @@ describe('authentication', () => {
     expect(await lastAuthor()).toBe('Jakub (277)');
   });
 
-  it('ignores forged or expired sessions', async () => {
+  it('ignores unknown and expired sessions', async () => {
     await start(ssoAuth);
-    const forged = createSealer('another-secret-that-is-long-enough-123').seal({ user: { id: '1', name: 'x' }, issuedAt: Date.now() });
-    const expired = createSealer(sessionSecret).seal({ user: { id: '1', name: 'x' }, issuedAt: Date.now() - 8 * 86_400_000 });
-    for (const session of [forged, expired, 'garbage']) {
+    const sealed = createSealer(sessionSecret).seal({ user: { id: '1', name: 'x' }, issuedAt: Date.now() });
+    const idle = await createSession(db, { id: '1', name: 'x' });
+    const tooOld = await createSession(db, { id: '2', name: 'y' });
+    await db.updateTable('session').set({ last_seen_at: daysAgo(8) }).where('user_id', '=', '1').execute();
+    await db.updateTable('session').set({ created_at: daysAgo(31) }).where('user_id', '=', '2').execute();
+
+    for (const session of [sealed, idle, tooOld, 'garbage']) {
       expect((await app.inject({ url: '/api/v1/me', headers: { cookie: `cloudmap_session=${session}` } })).statusCode).toBe(401);
     }
+    expect(await db.selectFrom('session').selectAll().execute()).toEqual([]);
+  });
+
+  it('renews the cookie of a session used again after a day', async () => {
+    await start(ssoAuth);
+    const token = await createSession(db, { id: '1', name: 'x' });
+    const me = () => app.inject({ url: '/api/v1/me', headers: { cookie: `cloudmap_session=${token}` } });
+
+    expect((await me()).headers['set-cookie']).toBeUndefined();
+    await db.updateTable('session').set({ last_seen_at: daysAgo(2) }).execute();
+    expect((await me()).headers['set-cookie']).toMatch(/^cloudmap_session=/);
+  });
+
+  it('revokes the session on logout', async () => {
+    await start(ssoAuth);
+    const cookie = `cloudmap_session=${await createSession(db, { id: '277', name: 'Jakub' })}`;
+    const other = `cloudmap_session=${await createSession(db, { id: '277', name: 'Jakub' })}`;
+
+    const logout = await app.inject({ url: '/auth/logout', headers: { cookie } });
+    expect(logout.statusCode).toBe(302);
+    expect(logout.headers.location).toBe('https://sso.example.org/logout');
+    expect((await app.inject({ url: '/api/v1/me', headers: { cookie } })).statusCode).toBe(401);
+    expect((await app.inject({ url: '/api/v1/me', headers: { cookie: other } })).statusCode).toBe(200);
   });
 
   it('accepts API keys', async () => {

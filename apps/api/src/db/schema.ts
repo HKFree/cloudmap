@@ -78,6 +78,15 @@ export interface LabelTable {
   align: string;
 }
 
+export interface SessionTable {
+  /** SHA-256 of the cookie token, so a leaked database does not leak usable cookies. */
+  id: string;
+  user_id: string;
+  user_name: string;
+  created_at: string;
+  last_seen_at: string;
+}
+
 export interface HistoryColumns {
   valid_from_rev: number;
   valid_to_rev: number | null;
@@ -100,7 +109,7 @@ export type HistoryTables = {
   [T in VersionedTable as `${T}_history`]: VersionedRows[T] & HistoryColumns;
 };
 
-export type Database = VersionedRows & HistoryTables & { revision: RevisionTable };
+export type Database = VersionedRows & HistoryTables & { revision: RevisionTable; session: SessionTable };
 
 export type Row<T extends VersionedTable> = Selectable<VersionedRows[T]>;
 export type NewRow<T extends VersionedTable> = Insertable<VersionedRows[T]>;
