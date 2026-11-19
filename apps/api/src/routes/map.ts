@@ -9,7 +9,7 @@ import {
   revisionSummarySchema,
   saveChangesSchema,
 } from '@cloudmap/shared';
-import { authorOf } from '../auth/auth';
+import { authorOf, requireUser } from '../auth/auth';
 import type { Db } from '../db/connection';
 import { restoreRevision, saveChanges, ValidationError } from '../repo/changes';
 import { loadMap } from '../repo/map';
@@ -55,7 +55,7 @@ export const mapRoutes =
         },
       },
       async (request, reply) =>
-        reply.code(201).send(await saveChanges(db, { ...request.body, author: authorOf(request.user!) })),
+        reply.code(201).send(await saveChanges(db, { ...request.body, author: authorOf(requireUser(request)) })),
     );
 
     app.get(
@@ -75,7 +75,7 @@ export const mapRoutes =
         },
       },
       async (request, reply) => {
-        const revision = await restoreRevision(db, request.params.id, request.body.message, authorOf(request.user!));
+        const revision = await restoreRevision(db, request.params.id, request.body.message, authorOf(requireUser(request)));
         if (!revision) return reply.code(404).send({ error: 'Revize neexistuje' });
         return reply.code(201).send(revision);
       },

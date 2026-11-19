@@ -29,6 +29,11 @@ export const DEV_USER: User = { id: 'dev', name: 'dev' };
 /** Text stored as the revision author, e.g. "Jakub (277)", "dev" or "api:import". */
 export const authorOf = (user: User) => (user.id === user.name ? user.name : `${user.name} (${user.id})`);
 
+export function requireUser(request: FastifyRequest): User {
+  if (!request.user) throw Object.assign(new Error('Nejsi přihlášený'), { statusCode: 401 });
+  return request.user;
+}
+
 const SESSION_COOKIE = 'cloudmap_session';
 const LOGIN_COOKIE = 'cloudmap_login';
 const SESSION_DAYS = 7;
@@ -86,10 +91,11 @@ export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfi
     request.user = auth.devMode ? DEV_USER : userFromSession(request, reply);
     if (request.user) return;
 
-    const path = request.url.split('?')[0]!;
-    if (path.startsWith('/api/')) return reply.code(401).send({ error: 'Nejsi přihlášený' });
+    // The matched route pattern, not the raw URL: the router decodes `/%61pi/...` to `/api/...`.
+    const route = request.routeOptions.url;
+    if (route?.startsWith('/api/')) return reply.code(401).send({ error: 'Nejsi přihlášený' });
     const wantsPage = request.method === 'GET' && request.headers.accept?.includes('text/html');
-    if (wantsPage && !path.startsWith('/auth/') && path !== '/healthz') {
+    if (wantsPage && !route?.startsWith('/auth/') && route !== '/healthz') {
       return reply.redirect(`/auth/login?returnTo=${encodeURIComponent(request.url)}`);
     }
   });
@@ -97,7 +103,7 @@ export async function registerAuth(appInstance: FastifyInstance, auth: AuthConfi
   app.get(
     '/api/v1/me',
     { schema: { summary: 'Přihlášený uživatel', response: { 200: currentUserSchema } } },
-    async (request) => ({ user: request.user!, devMode: auth.devMode }),
+    async (request) => ({ user: requireUser(request), devMode: auth.devMode }),
   );
 
   const returnToQuery = { querystring: z.object({ returnTo: z.string().optional() }), hide: true };

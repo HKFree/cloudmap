@@ -3,7 +3,7 @@ import { buildApp } from '../app';
 import { openDatabase, type Db } from '../db/connection';
 import { importDia } from '../dia/import';
 import { sampleDiagram } from '../test/fixtures';
-import { userFromClaims, type AuthConfig } from './auth';
+import { requireUser, userFromClaims, type AuthConfig } from './auth';
 import { createSealer } from './seal';
 
 const sessionSecret = 'test-secret-that-is-long-enough-1234567890';
@@ -40,6 +40,15 @@ describe('authentication', () => {
     expect((await app.inject({ url: '/api/v1/map' })).statusCode).toBe(401);
     expect((await save()).statusCode).toBe(401);
     expect((await app.inject({ url: '/healthz' })).statusCode).toBe(200);
+  });
+
+  it('rejects percent-encoded API paths without login', async () => {
+    await start(ssoAuth);
+    for (const url of ['/%61pi/v1/map', '/a%70i/v1/meta', '/ap%69/v1/me', '/%61pi/v1/revisions', '/%61pi/v1/docs/json']) {
+      expect((await app.inject({ url })).statusCode, url).toBe(401);
+    }
+    const encodedSave = await app.inject({ method: 'POST', url: '/%61pi/v1/changes', payload: { baseRevisionId: 1, message: 'x' } });
+    expect(encodedSave.statusCode).toBe(401);
   });
 
   it('sends browsers to the SSO login', async () => {
@@ -98,6 +107,13 @@ describe('authentication', () => {
       const response = await app.inject({ url: `/auth/login?returnTo=${encodeURIComponent(returnTo!)}` });
       expect(response.headers.location).toBe(expected);
     }
+  });
+});
+
+describe('requireUser', () => {
+  it('fails with 401 when nobody is signed in', () => {
+    expect(() => requireUser({ user: null } as never)).toThrow(expect.objectContaining({ statusCode: 401 }));
+    expect(requireUser({ user: { id: '1', name: 'x' } } as never)).toEqual({ id: '1', name: 'x' });
   });
 });
 
